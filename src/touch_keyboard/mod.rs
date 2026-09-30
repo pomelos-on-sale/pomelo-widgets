@@ -40,7 +40,7 @@
 pub mod keys;
 pub mod style;
 
-pub use keys::{Cell, Key, KeyAction, KeyKind, KeyboardMode};
+pub use keys::{Cell, Key, KeyAction, KeyKind, KeyLabel, KeyboardMode};
 
 use iced::widget::{button, container, text, Column, Row, Space};
 use iced::{Border, Element, Length, Padding, Shadow};
@@ -151,8 +151,16 @@ where
 {
     let palette = style::palette(key.kind);
 
+    let content: Element<'a, M> = match key.label {
+        KeyLabel::Text(label) => text(label).size(key.font).into(),
+        KeyLabel::Icon(icon) => text(icon.glyph())
+            .size(key.font)
+            .font(pomelo_material_symbols::font())
+            .into(),
+    };
+
     button(
-        container(text(key.label).size(key.font))
+        container(content)
             .center_x(Length::Fill)
             .center_y(Length::Fill),
     )

@@ -26,4 +26,8 @@
 //! widgets in it at all. An app that draws an icon depends on that crate as well — the launcher
 //! does, and it has no business with a keyboard.
 
+pub mod preferences;
 pub mod touch_keyboard;
+
+pub use pomelo_material_symbols;
+pub use preferences::{FontSizeTier, Language, SystemPreferences, ThemeMode};

@@ -12,12 +12,9 @@
 //! what it was: `key_w * 1.6` for the mode key, the shift key filling the edge of its row, and the
 //! same four rows, keys, colours and numeric mode as the iOS keyboard.
 //!
-//! One thing could not be ported faithfully. The original keyboard labels shift, backspace and
-//! return with the baked icons `⇧ ⬆ ⌫ ↵`, and the input cursor with `█`. The iced font is a Chinese
-//! and Latin subset (the Source Han Sans subset) and still has none of those five codepoints — it
-//! does carry the arrows and `± × ÷` now — and iced has no icon font for them, so those keys carry
-//! ASCII words (`shift`, `del`, `return`) and the cursor is painted as a block by whoever owns the
-//! text (see `lib.rs`).
+//! The original keyboard labels shift, backspace and return with icons (`⇧ ⌫ ↵`), which are
+//! rendered using [`pomelo_material_symbols`]. The input cursor is painted as a block by whoever
+//! owns the text (see `lib.rs`).
 
 /// Which page the on-screen keyboard is on.
 ///
@@ -59,10 +56,64 @@ pub enum KeyKind {
     ShiftActive,
 }
 
+use pomelo_material_symbols::Icon;
+
+/// How a key is labelled: plain text or an icon from `pomelo_material_symbols`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyLabel {
+    Text(&'static str),
+    Icon(Icon),
+}
+
+impl KeyLabel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            KeyLabel::Text(s) => s,
+            KeyLabel::Icon(icon) => icon.glyph(),
+        }
+    }
+}
+
+impl From<&'static str> for KeyLabel {
+    fn from(s: &'static str) -> Self {
+        KeyLabel::Text(s)
+    }
+}
+
+impl From<&&'static str> for KeyLabel {
+    fn from(s: &&'static str) -> Self {
+        KeyLabel::Text(*s)
+    }
+}
+
+impl From<Icon> for KeyLabel {
+    fn from(icon: Icon) -> Self {
+        KeyLabel::Icon(icon)
+    }
+}
+
+impl PartialEq<&str> for KeyLabel {
+    fn eq(&self, other: &&str) -> bool {
+        match self {
+            KeyLabel::Text(s) => s == other,
+            KeyLabel::Icon(icon) => icon.glyph() == *other,
+        }
+    }
+}
+
+impl PartialEq<Icon> for KeyLabel {
+    fn eq(&self, other: &Icon) -> bool {
+        match self {
+            KeyLabel::Icon(icon) => icon == other,
+            KeyLabel::Text(_) => false,
+        }
+    }
+}
+
 /// One key: what it draws, how much of its row it takes, and what it does.
 #[derive(Debug, Clone, Copy)]
 pub struct Key {
-    pub label: &'static str,
+    pub label: KeyLabel,
     pub kind: KeyKind,
     pub font: f32,
     /// This key's share of its row. The rows are flex, so a key's width is its share of whatever
@@ -122,6 +173,7 @@ const ENTER_PORTION: u16 = 180;
 /// sizes the platform bakes glyphs for.
 pub const CHAR_FONT: f32 = 24.0;
 pub const SPEC_FONT: f32 = 16.0;
+pub const ICON_FONT: f32 = 22.0;
 
 /// The four rows, top to bottom, in the order they are drawn.
 pub fn rows(mode: KeyboardMode) -> Vec<Vec<Cell>> {
@@ -133,9 +185,15 @@ pub fn rows(mode: KeyboardMode) -> Vec<Vec<Cell>> {
     ]
 }
 
-fn key(label: &'static str, kind: KeyKind, font: f32, portion: u16, action: KeyAction) -> Cell {
+fn key(
+    label: impl Into<KeyLabel>,
+    kind: KeyKind,
+    font: f32,
+    portion: u16,
+    action: KeyAction,
+) -> Cell {
     Cell::Key(Key {
-        label,
+        label: label.into(),
         kind,
         font,
         portion,
@@ -148,7 +206,7 @@ fn char_row(chars: &[(&'static str, char)], portion: u16) -> Vec<Cell> {
         .iter()
         .map(|(label, ch)| {
             key(
-                label,
+                *label,
                 KeyKind::Character,
                 CHAR_FONT,
                 portion,
@@ -178,24 +236,28 @@ fn row2(mode: KeyboardMode) -> Vec<Cell> {
 
 /// Shift / caps, the middle characters, and Del.
 fn row3(mode: KeyboardMode) -> Vec<Cell> {
-    let (shift_label, shift_kind, shift_event) = match mode {
+    let (shift_label, shift_font, shift_kind, shift_event) = match mode {
         KeyboardMode::Lower => (
-            "shift",
+            KeyLabel::Icon(Icon::SHIFT),
+            ICON_FONT,
             KeyKind::Special,
             KeyAction::SwitchMode(KeyboardMode::Upper),
         ),
         KeyboardMode::Upper => (
-            "SHIFT",
+            KeyLabel::Icon(Icon::SHIFT),
+            ICON_FONT,
             KeyKind::ShiftActive,
             KeyAction::SwitchMode(KeyboardMode::Lower),
         ),
         KeyboardMode::Numbers => (
-            "#+=",
+            KeyLabel::Text("#+="),
+            SPEC_FONT,
             KeyKind::Special,
             KeyAction::SwitchMode(KeyboardMode::Symbols),
         ),
         KeyboardMode::Symbols => (
-            "123",
+            KeyLabel::Text("123"),
+            SPEC_FONT,
             KeyKind::Special,
             KeyAction::SwitchMode(KeyboardMode::Numbers),
         ),
@@ -213,13 +275,13 @@ fn row3(mode: KeyboardMode) -> Vec<Cell> {
     let mut keys = vec![key(
         shift_label,
         shift_kind,
-        SPEC_FONT,
+        shift_font,
         shift_portion,
         shift_event,
     )];
     keys.extend(middle.iter().map(|(label, ch)| {
         key(
-            label,
+            *label,
             KeyKind::Character,
             CHAR_FONT,
             mid_portion,
@@ -227,9 +289,9 @@ fn row3(mode: KeyboardMode) -> Vec<Cell> {
         )
     }));
     keys.push(key(
-        "del",
+        Icon::BACKSPACE,
         KeyKind::Special,
-        SPEC_FONT,
+        ICON_FONT,
         shift_portion,
         KeyAction::Backspace,
     ));
@@ -270,9 +332,9 @@ fn row4(mode: KeyboardMode) -> Vec<Cell> {
             KeyAction::Char('.'),
         ),
         key(
-            "return",
+            Icon::KEYBOARD_RETURN,
             KeyKind::Return,
-            SPEC_FONT,
+            ICON_FONT,
             ENTER_PORTION,
             KeyAction::Enter,
         ),
@@ -504,6 +566,8 @@ mod tests {
         // `ShiftActive` is the white key: the one palette that is not the keyboard's grey.
         assert_eq!(row_keys(&lower[2])[0].kind, KeyKind::Special);
         assert_eq!(row_keys(&upper[2])[0].kind, KeyKind::ShiftActive);
+        assert_eq!(row_keys(&lower[2])[0].label, Icon::SHIFT);
+        assert_eq!(row_keys(&upper[2])[0].label, Icon::SHIFT);
     }
 
     #[test]
@@ -533,11 +597,27 @@ mod tests {
         let table = rows(KeyboardMode::Lower);
         let bottom = row_keys(&table[3]);
 
-        assert_eq!(bottom[3].label, "return");
+        assert_eq!(bottom[3].label, Icon::KEYBOARD_RETURN);
         assert_eq!(bottom[3].action, KeyAction::Enter);
         assert_eq!(bottom[3].kind, KeyKind::Return);
         assert_eq!(bottom[1].action, KeyAction::Space);
         assert_eq!(bottom[2].action, KeyAction::Char('.'));
+    }
+
+    #[test]
+    fn the_delete_key_is_backspace_icon() {
+        for mode in [
+            KeyboardMode::Lower,
+            KeyboardMode::Upper,
+            KeyboardMode::Numbers,
+            KeyboardMode::Symbols,
+        ] {
+            let table = rows(mode);
+            let row3 = row_keys(&table[2]);
+            let del = row3.last().unwrap();
+            assert_eq!(del.label, Icon::BACKSPACE);
+            assert_eq!(del.action, KeyAction::Backspace);
+        }
     }
 
     /// The space key is the widest, and every share is a multiple of a letter key's.
