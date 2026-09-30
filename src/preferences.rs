@@ -58,6 +58,18 @@ pub enum ThemeMode {
 }
 
 impl ThemeMode {
+    /// Returns whether this is dark mode.
+    #[inline]
+    pub fn is_dark(self) -> bool {
+        matches!(self, Self::Dark)
+    }
+
+    /// Returns whether this is light mode.
+    #[inline]
+    pub fn is_light(self) -> bool {
+        matches!(self, Self::Light)
+    }
+
     /// Returns the other theme mode, for toggle actions.
     #[inline]
     pub fn other(self) -> Self {

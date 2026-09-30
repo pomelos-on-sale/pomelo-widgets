@@ -58,6 +58,8 @@ pub const PAD_H: f32 = 6.0;
 /// The gap between two rows.
 pub const ROW_GAP: f32 = 8.0;
 
+use crate::preferences::ThemeMode;
+
 /// The band is this share of the screen's height, clamped to [`BAND_MIN`]..[`BAND_MAX`].
 ///
 /// From the original terminal: the keyboard takes about half the panel, and on a taller screen it
@@ -84,9 +86,21 @@ pub fn key_rows<'a, M>(mode: KeyboardMode, on_press: impl Fn(KeyAction) -> M + '
 where
     M: Clone + 'a,
 {
-    let rows = keys::rows(mode).into_iter().map(|row| {
+    key_rows_with_theme(mode, on_press, ThemeMode::Dark)
+}
+
+/// The keys of `mode` with `theme`, filling the box they are given, with no background.
+pub fn key_rows_with_theme<'a, M>(
+    mode: KeyboardMode,
+    on_press: impl Fn(KeyAction) -> M + 'a,
+    theme: ThemeMode,
+) -> Element<'a, M>
+where
+    M: Clone + 'a,
+{
+    let rows = keys::rows(mode).into_iter().map(move |row| {
         let cells = row.into_iter().map(|cell| match cell {
-            Cell::Key(key) => key_cell(key, &on_press),
+            Cell::Key(key) => key_cell_with_theme(key, &on_press, theme),
             Cell::HalfKey => Space::new()
                 .width(Length::FillPortion(keys::HALF_KEY_PORTION))
                 .into(),
@@ -109,7 +123,19 @@ pub fn band<'a, M>(mode: KeyboardMode, on_press: impl Fn(KeyAction) -> M + 'a) -
 where
     M: Clone + 'a,
 {
-    container(key_rows(mode, on_press))
+    band_with_theme(mode, on_press, ThemeMode::Dark)
+}
+
+/// The whole band for `theme`: the keys on the keyboard's own background, with its padding.
+pub fn band_with_theme<'a, M>(
+    mode: KeyboardMode,
+    on_press: impl Fn(KeyAction) -> M + 'a,
+    theme: ThemeMode,
+) -> Element<'a, M>
+where
+    M: Clone + 'a,
+{
+    container(key_rows_with_theme(mode, on_press, theme))
         .width(Length::Fill)
         .height(Length::Fill)
         .padding(Padding {
@@ -118,19 +144,23 @@ where
             bottom: PAD_V,
             left: PAD_H,
         })
-        .style(|_theme| container::Style {
-            background: Some(style::background().into()),
+        .style(move |_theme| container::Style {
+            background: Some(style::background_for(theme).into()),
             ..container::Style::default()
         })
         .into()
 }
 
-/// One key's cell: the key itself, with half the gap at each end.
-fn key_cell<'a, M>(key: Key, on_press: &impl Fn(KeyAction) -> M) -> Element<'a, M>
+/// One key's cell for `theme`: the key itself, with half the gap at each end.
+fn key_cell_with_theme<'a, M>(
+    key: Key,
+    on_press: &impl Fn(KeyAction) -> M,
+    theme: ThemeMode,
+) -> Element<'a, M>
 where
     M: Clone + 'a,
 {
-    container(key_button(key, on_press))
+    container(key_button_with_theme(key, on_press, theme))
         .width(Length::FillPortion(key.portion))
         .height(Length::Fill)
         .padding(Padding {
@@ -142,14 +172,16 @@ where
         .into()
 }
 
-/// One key: a button whose role's palette paints it, lighter while the finger is on it.
-///
-/// It fills its cell, so its size is the layout's and not a number of its own.
-fn key_button<'a, M>(key: Key, on_press: &impl Fn(KeyAction) -> M) -> Element<'a, M>
+/// One key for `theme`: a button whose role's palette paints it, lighter while the finger is on it.
+fn key_button_with_theme<'a, M>(
+    key: Key,
+    on_press: &impl Fn(KeyAction) -> M,
+    theme: ThemeMode,
+) -> Element<'a, M>
 where
     M: Clone + 'a,
 {
-    let palette = style::palette(key.kind);
+    let palette = style::palette_for(key.kind, theme);
 
     let content: Element<'a, M> = match key.label {
         KeyLabel::Text(label) => text(label).size(key.font).into(),

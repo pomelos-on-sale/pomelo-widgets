@@ -6,11 +6,20 @@
 use iced::Color;
 
 use super::keys::KeyKind;
+use crate::preferences::ThemeMode;
 
 /// The keyboard band's own background (#1C1C1E). The keys sit on it; the page behind them does not
 /// show through.
 pub fn background() -> Color {
-    rgb((28, 28, 30))
+    background_for(ThemeMode::Dark)
+}
+
+/// The keyboard band's background for `theme`.
+pub fn background_for(theme: ThemeMode) -> Color {
+    match theme {
+        ThemeMode::Dark => rgb((28, 28, 30)),
+        ThemeMode::Light => rgb((209, 213, 219)),
+    }
 }
 
 /// The keyboard's key radius.
@@ -29,15 +38,23 @@ pub struct KeyPalette {
 
 /// The iOS dark keyboard palette, by key role.
 pub fn palette(kind: KeyKind) -> KeyPalette {
-    let (fill, pressed, text) = match kind {
-        // #48484A letter keys, #6E6E73 pressed
-        KeyKind::Character => ((72, 72, 74), (110, 110, 115), (255, 255, 255)),
-        // #2C2C2E special/modifier, #48484A pressed
-        KeyKind::Special => ((44, 44, 46), (72, 72, 74), (255, 255, 255)),
-        // #007AFF accent blue return, #3C96FF pressed
-        KeyKind::Return => ((0, 122, 255), (60, 150, 255), (255, 255, 255)),
-        // Shift while caps is on: white, with black text
-        KeyKind::ShiftActive => ((255, 255, 255), (110, 110, 115), (0, 0, 0)),
+    palette_for(kind, ThemeMode::Dark)
+}
+
+/// The iOS keyboard palette, by key role and theme mode.
+pub fn palette_for(kind: KeyKind, theme: ThemeMode) -> KeyPalette {
+    let (fill, pressed, text) = match (kind, theme) {
+        // Dark theme:
+        (KeyKind::Character, ThemeMode::Dark) => ((72, 72, 74), (110, 110, 115), (255, 255, 255)),
+        (KeyKind::Special, ThemeMode::Dark) => ((44, 44, 46), (72, 72, 74), (255, 255, 255)),
+        (KeyKind::Return, ThemeMode::Dark) => ((0, 122, 255), (60, 150, 255), (255, 255, 255)),
+        (KeyKind::ShiftActive, ThemeMode::Dark) => ((255, 255, 255), (110, 110, 115), (0, 0, 0)),
+
+        // Light theme (iOS style light keyboard):
+        (KeyKind::Character, ThemeMode::Light) => ((255, 255, 255), (230, 230, 230), (0, 0, 0)),
+        (KeyKind::Special, ThemeMode::Light) => ((174, 179, 190), (195, 200, 210), (0, 0, 0)),
+        (KeyKind::Return, ThemeMode::Light) => ((0, 122, 255), (60, 150, 255), (255, 255, 255)),
+        (KeyKind::ShiftActive, ThemeMode::Light) => ((0, 0, 0), (60, 60, 60), (255, 255, 255)),
     };
 
     KeyPalette {
