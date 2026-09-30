@@ -31,3 +31,15 @@ That also means **this crate must never name a renderer**, which is a real trap 
 is normally built in: there, `iced_winit` *is* `iced-pomelo-winit`, and `iced/tiny-skia` reaches
 `iced_tiny_skia::window` — a module behind the `softbuffer` feature, which no edge in that graph
 enables. The symptom is `E0433: cannot find window in iced_tiny_skia`.
+
+## Licence
+
+GPL-3.0-only — see `LICENSE`. The same licence as the rest of the crates we own (`pomelo-hal`,
+`pomelo-gfx`, the renderer, the platform layer, the icon font, and the apps themselves). It said
+`MIT OR Apache-2.0` until 2026-09-30, when the apps moved into a repository of their own and were
+given a licence; this crate exists for those apps, so it was settled the same way rather than left
+as the odd one out.
+
+Being GPL makes it the same licence as, and compatible with, everything it is built against here.
+The keyboard is not a piece anyone takes elsewhere on its own — it is the one our terminal and our
+settings app must agree on — so there is nothing this choice costs.

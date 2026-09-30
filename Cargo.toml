@@ -3,16 +3,16 @@ name = "pomelo-widgets"
 version = "0.1.0"
 edition = "2021"
 description = "The widgets our apps share: one key table, one palette and one geometry for all of them"
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-only"
 
 # A member of the workspace one directory up (`vendor/Cargo.toml`), not a project of its own: the
 # libraries we own are built and tested together there, against the same fork of iced the firmware
 # is built with. There is deliberately no `[workspace]` here -- a member that declares one is
 # "multiple workspace roots found in the same workspace".
 #
-# Its consumers are the standalone apps (`apps/settings`, `apps/terminal`) and
-# `firmware/panel-tests`, which take it by path; the root of each of *their* graphs decides which
-# renderer draws.
+# Its consumers are the apps in `pomelos-on-sale/pomelo-apps` — which take it by git, pinned to a
+# revision, because that project builds on its own — and `firmware/panel-tests`, which takes it by
+# path; the root of each of *their* graphs decides which renderer draws.
 
 [dependencies]
 # The facade, like any other iced program. `default-features = false` because the defaults select
