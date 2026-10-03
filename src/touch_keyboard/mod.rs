@@ -202,7 +202,7 @@ where
     .style(move |_theme, status| button::Style {
         background: Some(
             match status {
-                button::Status::Pressed | button::Status::Hovered => palette.pressed,
+                button::Status::Pressed => palette.pressed,
                 _ => palette.fill,
             }
             .into(),
