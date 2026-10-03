@@ -30,5 +30,5 @@ license = "GPL-3.0-only"
 #
 # The apps keep their own `desktop = ["iced/tiny-skia"]`; features are per package, so the facade
 # is still built with it there, and the board's roots turn it off.
-iced = { version = "0.14", default-features = false, features = ["thread-pool", "x11", "wayland"] }
+iced = { version = "0.14", default-features = false, features = ["thread-pool", "x11", "wayland", "advanced"] }
 pomelo-material-symbols = { git = "https://github.com/pomelos-on-sale/pomelo-material-symbols.git", rev = "7dc390fb1924dc69b375e5ae77806857f798cc58" }

@@ -26,9 +26,18 @@
 //! widgets in it at all. An app that draws an icon depends on that crate as well — the launcher
 //! does, and it has no business with a keyboard.
 
+pub mod animation;
+pub mod gesture;
+pub mod pager;
 pub mod preferences;
 pub mod touch_keyboard;
 
+pub use animation::{AnimationController, Curve};
+pub use gesture::{
+    gesture_detector, GestureDetector, PanEndDetails, PanStartDetails, PanUpdateDetails,
+    SwipeDirection,
+};
+pub use pager::{pager, Pager};
 pub use pomelo_material_symbols;
 pub use preferences::{FontSizeTier, Language, SystemPreferences, ThemeMode};
 
