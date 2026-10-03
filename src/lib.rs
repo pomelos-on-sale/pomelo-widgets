@@ -31,3 +31,15 @@ pub mod touch_keyboard;
 
 pub use pomelo_material_symbols;
 pub use preferences::{FontSizeTier, Language, SystemPreferences, ThemeMode};
+
+/// Builds an icon text widget from [`pomelo_material_symbols::Icon`] styled with Material Symbols.
+///
+/// ```ignore
+/// use pomelo_widgets::icon;
+/// use pomelo_material_symbols::Icon;
+///
+/// icon(Icon::PLAY_ARROW).size(24)
+/// ```
+pub fn icon<'a>(icon: pomelo_material_symbols::Icon) -> iced::widget::Text<'a> {
+    iced::widget::text(icon.glyph()).font(pomelo_material_symbols::font())
+}
