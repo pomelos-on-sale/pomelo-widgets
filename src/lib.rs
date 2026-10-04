@@ -27,12 +27,14 @@
 //! does, and it has no business with a keyboard.
 
 pub mod animation;
+pub mod app;
 pub mod gesture;
 pub mod pager;
 pub mod preferences;
 pub mod touch_keyboard;
 
 pub use animation::{AnimationController, Curve};
+pub use app::AppMeta;
 pub use gesture::{
     gesture_detector, GestureDetector, PanEndDetails, PanStartDetails, PanUpdateDetails,
     SwipeDirection,
