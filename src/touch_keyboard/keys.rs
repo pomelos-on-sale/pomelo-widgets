@@ -28,6 +28,18 @@ pub enum KeyboardMode {
     Symbols,
 }
 
+impl KeyboardMode {
+    /// Applies a key action to update the keyboard mode if it requests a mode switch.
+    ///
+    /// Shift is locked: pressing Shift toggles between [`KeyboardMode::Lower`] and
+    /// [`KeyboardMode::Upper`]. Character inputs do not automatically revert the shift state.
+    pub fn update(&mut self, action: KeyAction) {
+        if let KeyAction::SwitchMode(mode) = action {
+            *self = mode;
+        }
+    }
+}
+
 /// What pressing a key does.
 ///
 /// The keyboard does not act on it: it hands it back through the closure the caller passed to
@@ -556,6 +568,25 @@ mod tests {
         // The *case* is the thing that changes, and it is visible in the labels.
         assert_eq!(row_keys(&lower[0])[0].label, "q");
         assert_eq!(row_keys(&upper[0])[0].label, "Q");
+    }
+
+    #[test]
+    fn keyboard_mode_update_locks_shift_across_char_actions() {
+        let mut mode = KeyboardMode::Lower;
+
+        // Shift pressed -> switches to Upper (locked)
+        mode.update(KeyAction::SwitchMode(KeyboardMode::Upper));
+        assert_eq!(mode, KeyboardMode::Upper);
+
+        // Typing characters retains uppercase mode
+        mode.update(KeyAction::Char('A'));
+        assert_eq!(mode, KeyboardMode::Upper);
+        mode.update(KeyAction::Char('B'));
+        assert_eq!(mode, KeyboardMode::Upper);
+
+        // Shift pressed again -> unlocks back to Lower
+        mode.update(KeyAction::SwitchMode(KeyboardMode::Lower));
+        assert_eq!(mode, KeyboardMode::Lower);
     }
 
     #[test]

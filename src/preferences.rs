@@ -3,7 +3,7 @@
 //! Provides the core types for:
 //! - [`Language`]: interface language (Chinese or English)
 //! - [`ThemeMode`]: display appearance (AMOLED Dark or Light)
-//! - [`FontSizeTier`]: typography scale aligned with pre-baked glyph tables (14px, 15px, 18px)
+//! - [`FontSizeTier`]: typography scale with three tiers (20px, 24px, 30px)
 //! - [`SystemPreferences`]: aggregated system preference state
 
 use iced::Color;
@@ -148,56 +148,89 @@ impl ThemeMode {
 
 /// The font size tier for primary body text.
 ///
-/// Provides two clean tiers:
-/// - [`FontSizeTier::Standard`]: 18 px (matches pre-baked 18px glyph table in Flash)
-/// - [`FontSizeTier::Large`]: 21 px (larger scale for enhanced readability)
+/// Provides four clean tiers:
+/// - [`FontSizeTier::ExtraSmall`]: 18 px (compact tier, app-launcher label scale)
+/// - [`FontSizeTier::Small`]: 20 px
+/// - [`FontSizeTier::Standard`]: 24 px
+/// - [`FontSizeTier::Large`]: 30 px
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FontSizeTier {
-    /// Default standard scale (base: 18 px).
+    /// Extra small scale (base: 18 px).
+    ExtraSmall,
+    /// Small scale (base: 20 px).
+    Small,
+    /// Default standard scale (base: 24 px).
     #[default]
     Standard,
-    /// Large scale (base: 21 px).
+    /// Large scale (base: 30 px).
     Large,
 }
 
 impl FontSizeTier {
-    /// Returns the other font size tier.
+    pub const COMPACT: Self = Self::ExtraSmall;
+
+    /// The four font size tier values in pixels: [18.0, 20.0, 24.0, 30.0].
+    pub const SIZES: [f32; 4] = [18.0, 20.0, 24.0, 30.0];
+
+    /// All four font size tiers in ascending order: [ExtraSmall, Small, Standard, Large].
+    pub const TIERS: [FontSizeTier; 4] = [
+        FontSizeTier::ExtraSmall,
+        FontSizeTier::Small,
+        FontSizeTier::Standard,
+        FontSizeTier::Large,
+    ];
+
+    /// Returns the four font size tier values in pixels: [18.0, 20.0, 24.0, 30.0].
     #[inline]
-    pub fn other(self) -> Self {
+    pub const fn sizes() -> [f32; 4] {
+        Self::SIZES
+    }
+
+    /// Cycles to the next font size tier (ExtraSmall -> Small -> Standard -> Large -> ExtraSmall).
+    #[inline]
+    pub fn cycle(self) -> Self {
         match self {
+            Self::ExtraSmall => Self::Small,
+            Self::Small => Self::Standard,
             Self::Standard => Self::Large,
-            Self::Large => Self::Standard,
+            Self::Large => Self::ExtraSmall,
         }
     }
 
-    /// Cycles to the next font size tier.
+    /// Returns the next font size tier.
     #[inline]
-    pub fn cycle(self) -> Self {
-        self.other()
+    pub fn other(self) -> Self {
+        self.cycle()
     }
 
     /// Human-readable name in `language`.
     pub fn name(self, language: Language) -> &'static str {
         match (self, language) {
-            (Self::Standard, Language::Chinese) => "标准 (18px)",
-            (Self::Standard, Language::English) => "Standard (18px)",
-            (Self::Large, Language::Chinese) => "大号 (21px)",
-            (Self::Large, Language::English) => "Large (21px)",
+            (Self::ExtraSmall, Language::Chinese) => "紧凑 (18px)",
+            (Self::ExtraSmall, Language::English) => "Compact (18px)",
+            (Self::Small, Language::Chinese) => "小号 (20px)",
+            (Self::Small, Language::English) => "Small (20px)",
+            (Self::Standard, Language::Chinese) => "标准 (24px)",
+            (Self::Standard, Language::English) => "Standard (24px)",
+            (Self::Large, Language::Chinese) => "大号 (30px)",
+            (Self::Large, Language::English) => "Large (30px)",
         }
     }
 
-    /// The base font size in pixels (18.0 for Standard, 21.0 for Large).
+    /// The base font size in pixels (18.0 for ExtraSmall, 20.0 for Small, 24.0 for Standard, 30.0 for Large).
     #[inline]
-    pub fn base_size(self) -> f32 {
+    pub const fn base_size(self) -> f32 {
         match self {
-            Self::Standard => 18.0,
-            Self::Large => 21.0,
+            Self::ExtraSmall => 18.0,
+            Self::Small => 20.0,
+            Self::Standard => 24.0,
+            Self::Large => 30.0,
         }
     }
 
     /// Label font size for application grid tiles and lists.
     #[inline]
-    pub fn label_size(self) -> f32 {
+    pub const fn label_size(self) -> f32 {
         self.base_size()
     }
 }
@@ -222,6 +255,18 @@ impl SystemPreferences {
             font_tier,
         }
     }
+
+    /// Returns the active base font size in pixels.
+    #[inline]
+    pub const fn font_size(&self) -> f32 {
+        self.font_tier.base_size()
+    }
+
+    /// The four available system font size tiers: [18.0, 20.0, 24.0, 30.0].
+    #[inline]
+    pub const fn font_sizes() -> [f32; 4] {
+        FontSizeTier::SIZES
+    }
 }
 
 #[cfg(test)]
@@ -242,9 +287,13 @@ mod tests {
 
     #[test]
     fn font_tier_toggles() {
-        assert_eq!(FontSizeTier::Standard.base_size(), 18.0);
-        assert_eq!(FontSizeTier::Large.base_size(), 21.0);
+        assert_eq!(FontSizeTier::ExtraSmall.base_size(), 18.0);
+        assert_eq!(FontSizeTier::Small.base_size(), 20.0);
+        assert_eq!(FontSizeTier::Standard.base_size(), 24.0);
+        assert_eq!(FontSizeTier::Large.base_size(), 30.0);
+        assert_eq!(FontSizeTier::ExtraSmall.cycle(), FontSizeTier::Small);
+        assert_eq!(FontSizeTier::Small.cycle(), FontSizeTier::Standard);
         assert_eq!(FontSizeTier::Standard.cycle(), FontSizeTier::Large);
-        assert_eq!(FontSizeTier::Large.cycle(), FontSizeTier::Standard);
+        assert_eq!(FontSizeTier::Large.cycle(), FontSizeTier::ExtraSmall);
     }
 }
