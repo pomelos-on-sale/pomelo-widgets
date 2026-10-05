@@ -37,6 +37,7 @@ pub struct Pager<
     interactive: bool,
     anim_duration: Duration,
     curve: Curve,
+    animated: bool,
 }
 
 impl<'a, Message, Theme, Renderer> Pager<'a, Message, Theme, Renderer> {
@@ -52,9 +53,10 @@ impl<'a, Message, Theme, Renderer> Pager<'a, Message, Theme, Renderer> {
             height: Length::Fill,
             swipe_commit: 200.0,
             touch_slop: 18.0,
-            interactive: true,
-            anim_duration: Duration::from_millis(250),
+            interactive: false,
+            anim_duration: Duration::ZERO,
             curve: Curve::EaseOutCubic,
+            animated: false,
         }
     }
 
@@ -103,11 +105,32 @@ impl<'a, Message, Theme, Renderer> Pager<'a, Message, Theme, Renderer> {
         self
     }
 
+    /// Sets whether page transition animations and visual dragging are enabled.
+    ///
+    /// Defaults to `false` (animations disabled: instant page snaps upon release, no live visual sliding).
+    /// When set to `true`, enables live interactive page sliding and smooth settle transition animations.
+    pub fn animated(mut self, animated: bool) -> Self {
+        self.animated = animated;
+        if animated {
+            self.interactive = true;
+            if self.anim_duration == Duration::ZERO {
+                self.anim_duration = Duration::from_millis(250);
+            }
+        } else {
+            self.interactive = false;
+            self.anim_duration = Duration::ZERO;
+        }
+        self
+    }
+
     /// Sets the duration of the settle transition animation when releasing a drag.
     ///
-    /// Defaults to 250 milliseconds. Set to [`Duration::ZERO`] to snap instantly.
+    /// Defaults to [`Duration::ZERO`] (instant snap). Setting a non-zero duration automatically enables animations.
     pub fn anim_duration(mut self, duration: Duration) -> Self {
         self.anim_duration = duration;
+        if duration > Duration::ZERO {
+            self.animated = true;
+        }
         self
     }
 
@@ -171,7 +194,7 @@ impl<'a, Message, Theme, Renderer> Pager<'a, Message, Theme, Renderer> {
             (0.0, None)
         };
 
-        if self.anim_duration == Duration::ZERO {
+        if !self.animated || self.anim_duration == Duration::ZERO {
             state.is_dragging = false;
             state.has_dragged = false;
             if let Some(target) = target_page {
@@ -420,14 +443,16 @@ where
                         state.is_dragging = true;
                         state.has_dragged = true;
                         just_started_dragging = true;
+                        // Absorb slop smoothly at trigger moment, shifting start_x so dragged_x starts from 0.0
+                        state.start_x += self.touch_slop.copysign(delta_x);
                     }
 
                     if state.is_dragging {
                         let can_prev = current_page > 0;
                         let can_next = current_page + 1 < page_count;
 
-                        // Subtract slop so drag motion starts smoothly from 0.0 instead of jumping
-                        let dragged_x = delta_x - self.touch_slop.copysign(delta_x);
+                        // Continuous linear drag displacement relative to slop-adjusted start_x
+                        let dragged_x = position.x - state.start_x;
 
                         // Apply damping when pulling past the ends
                         let effective_delta = if dragged_x > 0.0 && !can_prev {
@@ -462,14 +487,16 @@ where
                         state.is_dragging = true;
                         state.has_dragged = true;
                         just_started_dragging = true;
+                        // Absorb slop smoothly at trigger moment, shifting start_x so dragged_x starts from 0.0
+                        state.start_x += self.touch_slop.copysign(delta_x);
                     }
 
                     if state.is_dragging {
                         let can_prev = current_page > 0;
                         let can_next = current_page + 1 < page_count;
 
-                        // Subtract slop so drag motion starts smoothly from 0.0 instead of jumping
-                        let dragged_x = delta_x - self.touch_slop.copysign(delta_x);
+                        // Continuous linear drag displacement relative to slop-adjusted start_x
+                        let dragged_x = position.x - state.start_x;
 
                         let effective_delta = if dragged_x > 0.0 && !can_prev {
                             dragged_x * 0.25
@@ -500,26 +527,19 @@ where
                     state.pointer_down = false;
                     let had_dragged = state.has_dragged;
 
-                    let delta_x = position.x - state.start_x;
-                    let can_prev = current_page > 0;
-                    let can_next = current_page + 1 < page_count;
-                    let dragged_x = if had_dragged {
-                        delta_x - self.touch_slop.copysign(delta_x)
-                    } else {
-                        0.0
-                    };
-                    let effective_delta = if dragged_x > 0.0 && !can_prev {
-                        dragged_x * 0.25
-                    } else if dragged_x < 0.0 && !can_next {
-                        dragged_x * 0.25
-                    } else {
-                        dragged_x
-                    };
-                    let offset = if had_dragged { effective_delta } else { 0.0 };
-                    state.drag_offset = offset;
-
                     if had_dragged {
-                        self.start_settle(state, bounds.width, current_page, page_count, offset, shell);
+                        let can_prev = current_page > 0;
+                        let can_next = current_page + 1 < page_count;
+                        let dragged_x = position.x - state.start_x;
+                        let effective_delta = if dragged_x > 0.0 && !can_prev {
+                            dragged_x * 0.25
+                        } else if dragged_x < 0.0 && !can_next {
+                            dragged_x * 0.25
+                        } else {
+                            dragged_x
+                        };
+                        state.drag_offset = effective_delta;
+                        self.start_settle(state, bounds.width, current_page, page_count, effective_delta, shell);
                     }
                 }
             }
@@ -575,7 +595,7 @@ where
 
         // Calculate offset and adjusted cursor for child views
         let base_x = current_page as f32 * bounds.width;
-        let offset_x = if self.interactive {
+        let offset_x = if self.interactive || state.settle_target_page.is_some() {
             state.drag_offset
         } else {
             0.0
@@ -717,7 +737,7 @@ where
         let bounds = layout.bounds();
         let current_page = self.current_page.min(self.pages.len().saturating_sub(1));
         let base_x = current_page as f32 * bounds.width;
-        let offset_x = if self.interactive {
+        let offset_x = if self.interactive || state.settle_target_page.is_some() {
             state.drag_offset
         } else {
             0.0
@@ -770,7 +790,7 @@ where
         let state = tree.state.downcast_ref::<State>();
         let current_page = self.current_page.min(self.pages.len().saturating_sub(1));
         let base_x = current_page as f32 * bounds.width;
-        let offset_x = if self.interactive {
+        let offset_x = if self.interactive || state.settle_target_page.is_some() {
             state.drag_offset
         } else {
             0.0
@@ -873,6 +893,12 @@ mod tests {
 
     #[test]
     fn pager_builder_and_defaults() {
+        let p_default: Pager<'_, (), iced::Theme> =
+            pager(vec![text("Page 1").into(), text("Page 2").into()]);
+        assert!(!p_default.animated);
+        assert!(!p_default.interactive);
+        assert_eq!(p_default.anim_duration, Duration::ZERO);
+
         let pages: Vec<Element<'_, (), iced::Theme>> =
             vec![text("Page 1").into(), text("Page 2").into()];
         let p = pager(pages)
@@ -880,6 +906,7 @@ mod tests {
             .swipe_commit(64.0)
             .touch_slop(12.0)
             .interactive(true)
+            .animated(true)
             .anim_duration(Duration::from_millis(300))
             .curve(Curve::EaseOutQuad);
 
@@ -888,8 +915,33 @@ mod tests {
         assert_eq!(p.swipe_commit, 64.0);
         assert_eq!(p.touch_slop, 12.0);
         assert!(p.interactive);
+        assert!(p.animated);
         assert_eq!(p.anim_duration, Duration::from_millis(300));
         assert_eq!(p.curve, Curve::EaseOutQuad);
+    }
+
+    #[test]
+    fn pager_default_unanimated_snaps_instantly() {
+        let pages: Vec<Element<'_, usize, iced::Theme>> =
+            vec![text("Page 1").into(), text("Page 2").into()];
+        let p = pager(pages)
+            .current_page(0)
+            .on_change(|page| page);
+
+        assert!(!p.animated);
+
+        let mut state = State::default();
+        let mut messages = Vec::new();
+        let mut shell = Shell::new(&mut messages);
+
+        // Release at offset -200px on a 400px wide screen (50% commit threshold)
+        p.start_settle(&mut state, 400.0, 0, 2, -200.0, &mut shell);
+
+        // Must NOT start any animation
+        assert!(!state.animator.is_animating());
+        assert_eq!(state.settle_target_page, Some(1));
+        assert_eq!(state.drag_offset, -400.0);
+        assert_eq!(messages, vec![1]);
     }
 
     #[test]
@@ -898,6 +950,7 @@ mod tests {
             vec![text("Page 1").into(), text("Page 2").into()];
         let p = pager(pages)
             .current_page(0)
+            .animated(true)
             .on_change(|page| page)
             .anim_duration(Duration::from_millis(200))
             .curve(Curve::Linear);
@@ -933,6 +986,7 @@ mod tests {
             vec![text("Page 1").into(), text("Page 2").into()];
         let p = pager(pages)
             .current_page(0)
+            .animated(true)
             .swipe_commit(200.0)
             .on_change(|page| page);
 
@@ -956,6 +1010,7 @@ mod tests {
             vec![text("Page 1").into(), text("Page 2").into()];
         let p = pager(pages)
             .current_page(0)
+            .animated(true)
             .swipe_commit(200.0)
             .on_change(|page| page);
 
@@ -1021,5 +1076,100 @@ mod tests {
         assert_eq!(state.settle_target_page, None);
         assert_eq!(state.drag_offset, 0.0);
     }
+
+    #[test]
+    fn pager_drag_reversal_is_continuous_and_does_not_pop() {
+        use iced::advanced::Widget;
+
+        let mut p = pager(vec![text("Page 1").into(), text("Page 2").into()])
+            .current_page(0)
+            .touch_slop(18.0)
+            .swipe_commit(200.0);
+
+        let mut tree = Tree::new(&p as &dyn Widget<(), iced::Theme, ()>);
+        let mut messages = Vec::new();
+        let mut shell = Shell::new(&mut messages);
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(480.0, 480.0));
+        let layout_node = layout::Node::new(Size::new(480.0, 480.0));
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+
+        // 1. Touch down at x = 100.0
+        p.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerPressed {
+                id: touch::Finger(0),
+                position: Point::new(100.0, 240.0),
+            }),
+            layout,
+            mouse::Cursor::Unavailable,
+            &(),
+            &mut clipboard,
+            &mut shell,
+            &bounds,
+        );
+
+        let state = tree.state.downcast_ref::<State>();
+        assert!(!state.is_dragging);
+        assert_eq!(state.drag_offset, 0.0);
+
+        // 2. Drag right past slop (delta_x = +25.0) -> dragged_x should be +7.0, damped to +1.75 on page 0
+        p.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerMoved {
+                id: touch::Finger(0),
+                position: Point::new(125.0, 240.0),
+            }),
+            layout,
+            mouse::Cursor::Unavailable,
+            &(),
+            &mut clipboard,
+            &mut shell,
+            &bounds,
+        );
+
+        let state = tree.state.downcast_ref::<State>();
+        assert!(state.is_dragging);
+        assert!((state.drag_offset - 1.75).abs() < 1e-4);
+
+        // 3. Move finger back towards origin to x = 110.0 (delta = +10.0 from down)
+        // With previous copysign bug, dragged_x inverted sign to -8.0!
+        // Now it must stay on the right (+110 - 118 = -8 in raw, but continuous!)
+        // Specifically, as finger moves from 125 -> 120 -> 118 -> 115 -> 100:
+        // raw dragged_x moves smoothly from +7 -> +2 -> 0 -> -3 -> -18 without ANY 36px jump!
+        let mut prev_offset = state.drag_offset;
+        for x in [120.0, 118.0, 115.0, 105.0, 100.0, 95.0, 80.0] {
+            p.update(
+                &mut tree,
+                &Event::Touch(touch::Event::FingerMoved {
+                    id: touch::Finger(0),
+                    position: Point::new(x, 240.0),
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &(),
+                &mut clipboard,
+                &mut shell,
+                &bounds,
+            );
+            let cur_offset = tree.state.downcast_ref::<State>().drag_offset;
+            // Displacement must decrease monotonically as x decreases
+            assert!(
+                cur_offset <= prev_offset + 1e-5,
+                "Offset must decrease continuously when moving left: prev={}, cur={}",
+                prev_offset,
+                cur_offset
+            );
+            // Must have NO large discontinuities (jump <= 15px for small steps)
+            assert!(
+                (cur_offset - prev_offset).abs() < 20.0,
+                "Detected jump discontinuity: prev={}, cur={}",
+                prev_offset,
+                cur_offset
+            );
+            prev_offset = cur_offset;
+        }
+    }
 }
+
 
