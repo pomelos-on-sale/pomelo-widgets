@@ -35,13 +35,15 @@ impl BitmapIcon {
     }
 }
 
-/// An application icon: either a vector glyph (Material Symbol) or a baked bitmap.
+/// An application icon: either a vector glyph (Material Symbol), a pre-baked bitmap, or a QOI compressed image.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppIcon {
     /// A vector glyph from Material Symbols.
     Glyph(Icon),
     /// A hardware-native RGB565 + Alpha bitmap icon.
     Bitmap(BitmapIcon),
+    /// A Quite OK Image (QOI) compressed asset bytes (e.g. 118x118 RGBA with pre-applied squircle AA mask).
+    Qoi(&'static [u8]),
 }
 
 impl AppIcon {
@@ -60,25 +62,38 @@ impl AppIcon {
         Self::Bitmap(BitmapIcon::new(width, height, rgb565, alpha))
     }
 
+    /// Constructs a QOI compressed application icon.
+    pub const fn qoi(data: &'static [u8]) -> Self {
+        Self::Qoi(data)
+    }
+
     /// Returns the icon glyph if this is a [`AppIcon::Glyph`].
     pub const fn as_glyph(&self) -> Option<Icon> {
         match self {
             Self::Glyph(icon) => Some(*icon),
-            Self::Bitmap(_) => None,
+            _ => None,
         }
     }
 
     /// Returns the bitmap icon if this is a [`AppIcon::Bitmap`].
     pub const fn as_bitmap(&self) -> Option<BitmapIcon> {
         match self {
-            Self::Glyph(_) => None,
             Self::Bitmap(b) => Some(*b),
+            _ => None,
         }
     }
 
-    /// Whether this icon is a baked bitmap.
+    /// Returns the QOI bytes if this is a [`AppIcon::Qoi`].
+    pub const fn as_qoi(&self) -> Option<&'static [u8]> {
+        match self {
+            Self::Qoi(data) => Some(data),
+            _ => None,
+        }
+    }
+
+    /// Whether this icon is a bitmap or QOI image.
     pub const fn is_bitmap(&self) -> bool {
-        matches!(self, Self::Bitmap(_))
+        matches!(self, Self::Bitmap(_) | Self::Qoi(_))
     }
 }
 
