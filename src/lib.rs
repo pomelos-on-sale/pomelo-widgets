@@ -41,7 +41,7 @@ pub use gesture::{
 };
 pub use pager::{pager, Pager};
 pub use pomelo_material_symbols;
-pub use preferences::{FontSizeTier, Language, SystemPreferences, ThemeMode};
+pub use preferences::{FontSizeTier, Language, SleepTimeout, SystemPreferences, ThemeMode};
 
 /// Builds an icon text widget from [`pomelo_material_symbols::Icon`] styled with Material Symbols.
 ///
