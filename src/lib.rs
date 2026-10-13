@@ -28,6 +28,7 @@
 
 pub mod animation;
 pub mod app;
+pub mod clipboard;
 pub mod gesture;
 pub mod pager;
 pub mod preferences;

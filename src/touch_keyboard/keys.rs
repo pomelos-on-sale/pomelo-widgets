@@ -57,6 +57,8 @@ pub enum KeyAction {
     Space,
     /// Switch the keyboard to another page.
     SwitchMode(KeyboardMode),
+    /// Paste text from the system clipboard.
+    Paste,
 }
 
 /// Which palette a key takes. Mirrors the original keyboard's `KeyKind`.
@@ -172,9 +174,10 @@ const WIDE_SHIFT_PORTION: u16 = 170;
 const WIDE_KEY_PORTION: u16 = 135;
 /// The mode key on the bottom row ("123" / "ABC").
 const MODE_PORTION: u16 = 160;
-/// Space, the widest key: the original made it the row's remainder, which is what a share of 6.43
-/// letter keys comes to.
-const SPACE_PORTION: u16 = 643;
+/// The paste key on the bottom row.
+const PASTE_PORTION: u16 = 120;
+/// Space, the widest key.
+const SPACE_PORTION: u16 = 643 - PASTE_PORTION;
 /// The dot beside it, a letter key's width.
 const DOT_PORTION: u16 = KEY_PORTION;
 /// Return, the original's `key_w * 1.8`.
@@ -310,7 +313,7 @@ fn row3(mode: KeyboardMode) -> Vec<Cell> {
     keys
 }
 
-/// Mode toggle, space, dot and return.
+/// Mode toggle, paste, space, dot and return.
 fn row4(mode: KeyboardMode) -> Vec<Cell> {
     let (mode_label, mode_event) = match mode {
         KeyboardMode::Lower | KeyboardMode::Upper => {
@@ -328,6 +331,13 @@ fn row4(mode: KeyboardMode) -> Vec<Cell> {
             SPEC_FONT,
             MODE_PORTION,
             mode_event,
+        ),
+        key(
+            Icon::CONTENT_PASTE,
+            KeyKind::Special,
+            ICON_FONT,
+            PASTE_PORTION,
+            KeyAction::Paste,
         ),
         key(
             "space",
@@ -547,7 +557,7 @@ mod tests {
                 if letters { 9 } else { 7 },
                 "{mode:?} row 3"
             );
-            assert_eq!(row_keys(&table[3]).len(), 4, "{mode:?} row 4");
+            assert_eq!(row_keys(&table[3]).len(), 5, "{mode:?} row 4");
         }
     }
 
@@ -628,11 +638,14 @@ mod tests {
         let table = rows(KeyboardMode::Lower);
         let bottom = row_keys(&table[3]);
 
-        assert_eq!(bottom[3].label, Icon::KEYBOARD_RETURN);
-        assert_eq!(bottom[3].action, KeyAction::Enter);
-        assert_eq!(bottom[3].kind, KeyKind::Return);
-        assert_eq!(bottom[1].action, KeyAction::Space);
-        assert_eq!(bottom[2].action, KeyAction::Char('.'));
+        assert_eq!(bottom[0].label, "123");
+        assert_eq!(bottom[1].label, Icon::CONTENT_PASTE);
+        assert_eq!(bottom[1].action, KeyAction::Paste);
+        assert_eq!(bottom[2].action, KeyAction::Space);
+        assert_eq!(bottom[3].action, KeyAction::Char('.'));
+        assert_eq!(bottom[4].label, Icon::KEYBOARD_RETURN);
+        assert_eq!(bottom[4].action, KeyAction::Enter);
+        assert_eq!(bottom[4].kind, KeyKind::Return);
     }
 
     #[test]
@@ -660,14 +673,14 @@ mod tests {
     fn the_shares_keep_the_originals_relationships() {
         let table = rows(KeyboardMode::Lower);
         let bottom = row_keys(&table[3]);
-        let space = bottom[1].portion;
+        let space = bottom[2].portion;
 
         assert!(
             space > bottom[0].portion,
             "space is wider than the mode key"
         );
         assert!(
-            bottom[3].portion > bottom[0].portion,
+            bottom[4].portion > bottom[0].portion,
             "return is wider than it"
         );
 
