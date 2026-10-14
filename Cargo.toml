@@ -35,3 +35,6 @@ pomelo-material-symbols = { git = "https://github.com/pomelos-on-sale/pomelo-mat
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 
+[target.'cfg(not(target_os = "espidf"))'.dependencies]
+arboard = { version = "3", default-features = false, features = ["wayland-data-control"] }
+
