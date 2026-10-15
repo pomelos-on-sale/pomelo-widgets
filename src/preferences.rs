@@ -327,18 +327,42 @@ pub const PREFERENCES_DIR: &str = "SETTINGS";
 /// Filename for system preferences.
 pub const PREFERENCES_FILE: &str = "preferences.toml";
 
+/// Returns whether the current process is running as a test harness binary.
+pub fn is_test_runner() -> bool {
+    #[cfg(test)]
+    {
+        true
+    }
+    #[cfg(not(test))]
+    {
+        if let Ok(exe) = std::env::current_exe() {
+            let s = exe.to_string_lossy();
+            if s.contains("/target/") && s.contains("/deps/") {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 /// Resolves the storage root for system preferences.
 pub fn resolve_app_data_root() -> PathBuf {
-    if Path::new("/internal/AppData").exists() {
+    if let Ok(custom) = std::env::var("POMELO_APP_DATA") {
+        let trimmed = custom.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
+    if Path::new("/internal/AppData").exists() || Path::new("/internal").exists() {
         PathBuf::from("/internal/AppData")
-    } else if Path::new("./internal/AppData").exists() {
+    } else if Path::new("./internal/AppData").exists() || Path::new("./internal").exists() {
         PathBuf::from("./internal/AppData")
-    } else if Path::new("/internal").exists() {
-        PathBuf::from("/internal/AppData")
-    } else if Path::new("./internal").exists() {
-        PathBuf::from("./internal/AppData")
-    } else {
+    } else if is_test_runner() {
         PathBuf::from(BOARD_APP_DATA)
+    } else if let Ok(home) = std::env::var("HOME") {
+        PathBuf::from(home).join(".pomelo/AppData")
+    } else {
+        std::env::temp_dir().join("pomelo/AppData")
     }
 }
 
@@ -403,15 +427,33 @@ impl SystemPreferences {
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
-    /// Saves preferences to a specified root directory.
+    /// Saves preferences atomically to a specified root directory, skipping write if unchanged.
     pub fn save_to(&self, root: impl AsRef<Path>) -> io::Result<()> {
         let p = Self::file_path(root);
+        let text = toml::to_string(self)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+        // 避免重复写入无变化的 Flash 内容
+        if p.exists() {
+            if let Ok(existing) = fs::read_to_string(&p) {
+                if existing == text {
+                    return Ok(());
+                }
+            }
+        }
+
         if let Some(parent) = p.parent() {
             fs::create_dir_all(parent)?;
         }
-        let text = toml::to_string(self)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        fs::write(p, text)
+
+        let temp_name = format!(".preferences.toml.tmp.{}", std::process::id());
+        let temp_path = p.with_file_name(temp_name);
+        fs::write(&temp_path, &text)?;
+        if let Err(e) = fs::rename(&temp_path, &p) {
+            let _ = fs::remove_file(&temp_path);
+            return Err(e);
+        }
+        Ok(())
     }
 
     /// Loads preferences from active persistent storage root.
