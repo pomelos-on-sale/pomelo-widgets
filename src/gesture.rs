@@ -708,6 +708,320 @@ where
     }
 }
 
+/// A container widget that enforces "drag is never a tap" for interactive child widgets.
+///
+/// When wrapped around interactive controls (such as a list of option buttons inside a scrollable),
+/// it tracks pointer movements (touch and mouse):
+/// - A press event is passed through to child widgets so they can highlight immediately.
+/// - If displacement exceeds `touch_slop` (default 10.0 px), a `FingerLost` event is dispatched to
+///   children to cancel their pressed state and clear highlights.
+/// - When the pointer is released after dragging, the release event is suppressed from children
+///   (sending `FingerLost` instead of `FingerLifted` or `ButtonReleased`).
+/// - If the pointer is released without dragging (within `touch_slop`), the release event passes
+///   through normally so the child can trigger its click / tap action.
+pub struct DragDisambiguator<
+    'a,
+    Message,
+    Theme = iced::Theme,
+    Renderer = iced::Renderer,
+> {
+    content: Element<'a, Message, Theme, Renderer>,
+    touch_slop: f32,
+}
+
+impl<'a, Message, Theme, Renderer> DragDisambiguator<'a, Message, Theme, Renderer> {
+    /// Creates a new [`DragDisambiguator`] wrapping `content`.
+    pub fn new(content: impl Into<Element<'a, Message, Theme, Renderer>>) -> Self {
+        Self {
+            content: content.into(),
+            touch_slop: 10.0,
+        }
+    }
+
+    /// Sets the touch slop threshold in pixels (default 10.0 px).
+    pub fn touch_slop(mut self, slop: f32) -> Self {
+        self.touch_slop = slop.max(0.0);
+        self
+    }
+}
+
+/// Convenience builder function for [`DragDisambiguator`].
+pub fn drag_disambiguator<'a, Message, Theme, Renderer>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+) -> DragDisambiguator<'a, Message, Theme, Renderer> {
+    DragDisambiguator::new(content)
+}
+
+#[derive(Debug, Default)]
+struct DisambiguatorState {
+    pointer_down: bool,
+    start_pos: Point,
+    has_dragged: bool,
+}
+
+impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
+    for DragDisambiguator<'_, Message, Theme, Renderer>
+where
+    Renderer: renderer::Renderer,
+    Message: Clone,
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<DisambiguatorState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(DisambiguatorState::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content.as_widget_mut().layout(
+            &mut tree.children[0],
+            renderer,
+            limits,
+        )
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            operation,
+        );
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        let state = tree.state.downcast_mut::<DisambiguatorState>();
+        let bounds = layout.bounds();
+
+        let touch_pos = match event {
+            Event::Touch(touch::Event::FingerPressed { position, .. })
+            | Event::Touch(touch::Event::FingerMoved { position, .. })
+            | Event::Touch(touch::Event::FingerLifted { position, .. }) => Some(*position),
+            _ => cursor.position(),
+        };
+
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                if let Some(pos) = cursor.position_over(bounds) {
+                    state.pointer_down = true;
+                    state.start_pos = pos;
+                    state.has_dragged = false;
+                }
+            }
+            Event::Touch(touch::Event::FingerPressed { position, .. }) => {
+                if bounds.contains(*position) {
+                    state.pointer_down = true;
+                    state.start_pos = *position;
+                    state.has_dragged = false;
+                }
+            }
+            Event::Mouse(mouse::Event::CursorMoved { position }) => {
+                if state.pointer_down {
+                    let pos = touch_pos.unwrap_or(*position);
+                    let delta_x = pos.x - state.start_pos.x;
+                    let delta_y = pos.y - state.start_pos.y;
+                    let dist = (delta_x * delta_x + delta_y * delta_y).sqrt();
+
+                    if !state.has_dragged && dist >= self.touch_slop {
+                        state.has_dragged = true;
+
+                        let cancel = Event::Touch(touch::Event::FingerLost {
+                            id: touch::Finger(0),
+                            position: pos,
+                        });
+                        self.content.as_widget_mut().update(
+                            &mut tree.children[0],
+                            &cancel,
+                            layout,
+                            cursor,
+                            renderer,
+                            clipboard,
+                            shell,
+                            viewport,
+                        );
+                        shell.request_redraw();
+                    }
+                }
+            }
+            Event::Touch(touch::Event::FingerMoved { position, .. }) => {
+                if state.pointer_down {
+                    let pos = *position;
+                    let delta_x = pos.x - state.start_pos.x;
+                    let delta_y = pos.y - state.start_pos.y;
+                    let dist = (delta_x * delta_x + delta_y * delta_y).sqrt();
+
+                    if !state.has_dragged && dist >= self.touch_slop {
+                        state.has_dragged = true;
+
+                        let cancel = Event::Touch(touch::Event::FingerLost {
+                            id: touch::Finger(0),
+                            position: pos,
+                        });
+                        self.content.as_widget_mut().update(
+                            &mut tree.children[0],
+                            &cancel,
+                            layout,
+                            cursor,
+                            renderer,
+                            clipboard,
+                            shell,
+                            viewport,
+                        );
+                        shell.request_redraw();
+                    }
+                }
+            }
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerLifted { .. }) => {
+                if state.pointer_down {
+                    state.pointer_down = false;
+
+                    if state.has_dragged {
+                        state.has_dragged = false;
+
+                        // DRAG IS NEVER A TAP:
+                        // Suppress release to children to prevent false activation!
+                        let cancel = Event::Touch(touch::Event::FingerLost {
+                            id: touch::Finger(0),
+                            position: touch_pos.unwrap_or(state.start_pos),
+                        });
+                        self.content.as_widget_mut().update(
+                            &mut tree.children[0],
+                            &cancel,
+                            layout,
+                            cursor,
+                            renderer,
+                            clipboard,
+                            shell,
+                            viewport,
+                        );
+                        return;
+                    }
+                }
+            }
+            Event::Touch(touch::Event::FingerLost { .. }) => {
+                state.pointer_down = false;
+                state.has_dragged = false;
+            }
+            _ => {}
+        }
+
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
+    }
+}
+
+impl<'a, Message, Theme, Renderer> From<DragDisambiguator<'a, Message, Theme, Renderer>>
+    for Element<'a, Message, Theme, Renderer>
+where
+    Message: 'a + Clone,
+    Theme: 'a,
+    Renderer: 'a + renderer::Renderer,
+{
+    fn from(
+        disambiguator: DragDisambiguator<'a, Message, Theme, Renderer>,
+    ) -> Element<'a, Message, Theme, Renderer> {
+        Element::new(disambiguator)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -734,6 +1048,253 @@ mod tests {
     fn swipe_directions() {
         assert_eq!(SwipeDirection::Left, SwipeDirection::Left);
         assert_ne!(SwipeDirection::Left, SwipeDirection::Right);
+    }
+
+    #[test]
+    fn drag_disambiguator_builder_and_defaults() {
+        let content: Element<'_, (), iced::Theme> = text("test").into();
+        let disambiguator = drag_disambiguator(content).touch_slop(15.0);
+        assert_eq!(disambiguator.touch_slop, 15.0);
+    }
+
+    #[test]
+    fn drag_is_never_a_tap_touch() {
+        use iced::widget::button;
+
+        let btn = button(text("Click me")).on_press(42usize);
+        let mut disambiguator: DragDisambiguator<'_, usize, iced::Theme, iced::Renderer> =
+            drag_disambiguator(btn).touch_slop(10.0);
+
+        let mut tree = Tree::new(&disambiguator as &dyn Widget<usize, iced::Theme, iced::Renderer>);
+        let mut messages = Vec::new();
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(200.0, 50.0));
+        let layout_node = layout::Node::with_children(
+            Size::new(200.0, 50.0),
+            vec![layout::Node::new(Size::new(200.0, 50.0))],
+        );
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+
+        // 1. Touch down at (100.0, 25.0) over button
+        disambiguator.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerPressed {
+                id: touch::Finger(0),
+                position: Point::new(100.0, 25.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 25.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 2. Drag vertically past slop: move to (100.0, 60.0) (35px displacement)
+        disambiguator.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerMoved {
+                id: touch::Finger(0),
+                position: Point::new(100.0, 60.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 60.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 3. Touch release at (100.0, 60.0)
+        disambiguator.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerLifted {
+                id: touch::Finger(0),
+                position: Point::new(100.0, 60.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 60.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // Drag is NEVER a tap! Must NOT emit any messages!
+        assert!(messages.is_empty(), "expected no messages, got: {:?}", messages);
+    }
+
+    #[test]
+    fn tap_works_touch() {
+        use iced::widget::button;
+
+        let btn = button(text("Click me")).on_press(42usize);
+        let mut disambiguator: DragDisambiguator<'_, usize, iced::Theme, iced::Renderer> =
+            drag_disambiguator(btn).touch_slop(10.0);
+
+        let mut tree = Tree::new(&disambiguator as &dyn Widget<usize, iced::Theme, iced::Renderer>);
+        let mut messages = Vec::new();
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(200.0, 50.0));
+        let layout_node = layout::Node::with_children(
+            Size::new(200.0, 50.0),
+            vec![layout::Node::new(Size::new(200.0, 50.0))],
+        );
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+
+        // 1. Touch down at (100.0, 25.0)
+        disambiguator.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerPressed {
+                id: touch::Finger(0),
+                position: Point::new(100.0, 25.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 25.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 2. Minor tremor: move to (101.0, 26.0) (dist ~1.4px < 10px slop)
+        disambiguator.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerMoved {
+                id: touch::Finger(0),
+                position: Point::new(101.0, 26.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(101.0, 26.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 3. Touch release at (101.0, 26.0)
+        disambiguator.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerLifted {
+                id: touch::Finger(0),
+                position: Point::new(101.0, 26.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(101.0, 26.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // Genuine tap: MUST emit the button's message!
+        assert_eq!(messages, vec![42usize]);
+    }
+
+    #[test]
+    fn drag_is_never_a_tap_mouse() {
+        use iced::widget::button;
+
+        let btn = button(text("Click me")).on_press(99usize);
+        let mut disambiguator: DragDisambiguator<'_, usize, iced::Theme, iced::Renderer> =
+            drag_disambiguator(btn).touch_slop(10.0);
+
+        let mut tree = Tree::new(&disambiguator as &dyn Widget<usize, iced::Theme, iced::Renderer>);
+        let mut messages = Vec::new();
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(200.0, 50.0));
+        let layout_node = layout::Node::with_children(
+            Size::new(200.0, 50.0),
+            vec![layout::Node::new(Size::new(200.0, 50.0))],
+        );
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+
+        // 1. Mouse down at (100.0, 25.0)
+        disambiguator.update(
+            &mut tree,
+            &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 25.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 2. Drag vertically past slop: move to (100.0, 5.0) (20px displacement)
+        disambiguator.update(
+            &mut tree,
+            &Event::Mouse(mouse::Event::CursorMoved {
+                position: Point::new(100.0, 5.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 5.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 3. Mouse release at (100.0, 5.0)
+        disambiguator.update(
+            &mut tree,
+            &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 5.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // Drag is NEVER a tap! Must NOT emit any messages!
+        assert!(messages.is_empty(), "expected no messages, got: {:?}", messages);
+    }
+
+    #[test]
+    fn tap_works_mouse() {
+        use iced::widget::button;
+
+        let btn = button(text("Click me")).on_press(99usize);
+        let mut disambiguator: DragDisambiguator<'_, usize, iced::Theme, iced::Renderer> =
+            drag_disambiguator(btn).touch_slop(10.0);
+
+        let mut tree = Tree::new(&disambiguator as &dyn Widget<usize, iced::Theme, iced::Renderer>);
+        let mut messages = Vec::new();
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(200.0, 50.0));
+        let layout_node = layout::Node::with_children(
+            Size::new(200.0, 50.0),
+            vec![layout::Node::new(Size::new(200.0, 50.0))],
+        );
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+
+        // 1. Mouse down at (100.0, 25.0)
+        disambiguator.update(
+            &mut tree,
+            &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 25.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 2. Mouse release at same position (100.0, 25.0)
+        disambiguator.update(
+            &mut tree,
+            &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+            layout,
+            mouse::Cursor::Available(Point::new(100.0, 25.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // Genuine tap: MUST emit the button's message!
+        assert_eq!(messages, vec![99usize]);
     }
 }
 

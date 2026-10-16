@@ -37,8 +37,8 @@ pub mod touch_keyboard;
 pub use animation::{AnimationController, Curve};
 pub use app::{AppIcon, AppMeta, BitmapIcon};
 pub use gesture::{
-    gesture_detector, GestureDetector, PanEndDetails, PanStartDetails, PanUpdateDetails,
-    SwipeDirection,
+    drag_disambiguator, gesture_detector, DragDisambiguator, GestureDetector, PanEndDetails,
+    PanStartDetails, PanUpdateDetails, SwipeDirection,
 };
 pub use pager::{pager, Pager};
 pub use pomelo_material_symbols;

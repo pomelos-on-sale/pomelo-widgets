@@ -288,7 +288,7 @@
         let pages_0: Vec<Element<'_, usize, iced::Theme>> =
             vec![text("Page 1").into(), text("Page 2").into()];
         let p0 = pager(pages_0).current_page(0).on_change(|page| page);
-        let mut tree = Tree::new(&p0 as &dyn Widget<usize, iced::Theme, ()>);
+        let mut tree = Tree::new(&p0 as &dyn Widget<usize, iced::Theme, iced::Renderer>);
 
         // Simulate release settling to target page 1
         {
