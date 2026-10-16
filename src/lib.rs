@@ -28,7 +28,7 @@
 
 pub mod animation;
 pub mod app;
-pub mod clipboard;
+pub mod dialog;
 pub mod gesture;
 pub mod pager;
 pub mod preferences;
@@ -36,6 +36,10 @@ pub mod touch_keyboard;
 
 pub use animation::{AnimationController, Curve};
 pub use app::{AppIcon, AppMeta, BitmapIcon};
+pub use dialog::{
+    dialog_box, dialog_button, dialog_cancel_button, dialog_card, dialog_confirm_button,
+    dialog_danger_button, modal_dialog, DialogButtonStyle,
+};
 pub use gesture::{
     drag_disambiguator, gesture_detector, DragDisambiguator, GestureDetector, PanEndDetails,
     PanStartDetails, PanUpdateDetails, SwipeDirection,
