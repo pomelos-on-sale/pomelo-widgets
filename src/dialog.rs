@@ -79,6 +79,7 @@ pub fn dialog_card<'a, Message: 'a>(
 }
 
 /// Standard 360 px modal dialog box with card background, border, title, body, and action buttons.
+#[deprecated(note = "Centered dialogs are forbidden in Pomelo OS. Use ActionSheet instead.")]
 pub fn dialog_box<'a, Message: 'a>(
     title: impl Into<Element<'a, Message>>,
     body: impl Into<Element<'a, Message>>,
@@ -244,6 +245,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn dialog_box_builds_without_panic() {
         let title = text("Title");
         let body = text("Body description");
