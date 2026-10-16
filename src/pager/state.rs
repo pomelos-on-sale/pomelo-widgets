@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::time::Instant;
 use crate::animation::AnimationController;
 
@@ -14,5 +15,6 @@ pub(crate) struct State {
     pub(crate) last_x: f32,
     pub(crate) last_move_time: Option<Instant>,
     pub(crate) velocity_x: f32,
+    pub(crate) velocity_samples: VecDeque<(Instant, f32)>,
     pub(crate) last_page: Option<usize>,
 }

@@ -151,21 +151,21 @@ impl<'a, Message, Theme, Renderer> Pager<'a, Message, Theme, Renderer> {
         offset: f32,
         shell: &mut Shell<'_, Message>,
     ) {
-        // Flutter's kMinFlingVelocity is between 400.0 and 800.0 px/s.
-        // A flick above 450.0 px/s is recognized as an intentional fling gesture.
-        const MIN_FLING_VELOCITY: f32 = 450.0;
+        // Flutter's kMinFlingVelocity is between 100.0 and 400.0 px/s (desktop vs touch).
+        // A flick above 200.0 px/s is recognized as an intentional fling gesture.
+        const MIN_FLING_VELOCITY: f32 = 200.0;
 
         let has_on_change = self.on_change.is_some();
         let can_next = has_on_change && current_page + 1 < page_count;
         let can_prev = has_on_change && current_page > 0;
 
         // In Flutter PageScrollPhysics, slow dragging snaps to page.roundToDouble() (50% of screen).
-        // If swipe_commit is configured, clamp the commit ratio between 0.35 and 0.50.
+        // If swipe_commit is configured, clamp the commit ratio between 0.25 and 0.45.
         let commit_dist = self.swipe_commit.max(1.0);
         let commit_ratio = if width > 0.0 {
-            (commit_dist / width).clamp(0.35, 0.5)
+            (commit_dist / width).clamp(0.25, 0.45)
         } else {
-            0.5
+            0.35
         };
 
         // Fractional page offset (positive = towards next page, negative = towards prev page)
@@ -248,6 +248,23 @@ pub fn pager<'a, Message, Theme, Renderer>(
 mod state;
 use state::State;
 
+fn sync_current_page(state: &mut State, current_page: usize) {
+    if state.last_page != Some(current_page) {
+        state.last_page = Some(current_page);
+        if let Some(target) = state.settle_target_page {
+            if current_page == target {
+                state.settle_target_page = None;
+                state.drag_offset = 0.0;
+                state.has_dragged = false;
+            }
+        } else if state.animator.is_animating() {
+            state.animator.stop();
+            state.settle_target_page = None;
+            state.drag_offset = 0.0;
+        }
+    }
+}
+
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for Pager<'_, Message, Theme, Renderer>
 where
@@ -267,6 +284,8 @@ where
     }
 
     fn diff(&self, tree: &mut Tree) {
+        let state = tree.state.downcast_mut::<State>();
+        sync_current_page(state, self.current_page);
         tree.diff_children(&self.pages);
     }
 
@@ -337,22 +356,10 @@ where
         let page_count = self.pages.len();
         let current_page = self.current_page.min(page_count.saturating_sub(1));
         let mut just_started_dragging = false;
+        let was_dragged = state.has_dragged;
 
         // If parent switched current_page externally or in response to on_change:
-        if state.last_page != Some(self.current_page) {
-            state.last_page = Some(self.current_page);
-            if let Some(target) = state.settle_target_page {
-                if self.current_page == target {
-                    state.settle_target_page = None;
-                    state.drag_offset = 0.0;
-                    state.has_dragged = false;
-                }
-            } else if state.animator.is_animating() {
-                state.animator.stop();
-                state.settle_target_page = None;
-                state.drag_offset = 0.0;
-            }
-        }
+        sync_current_page(state, self.current_page);
 
         let touch_pos = match event {
             Event::Touch(touch::Event::FingerPressed { position, .. })
@@ -364,13 +371,16 @@ where
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 if let Some(pos) = cursor.position_over(bounds) {
+                    let now = Instant::now();
+                    state.velocity_samples.clear();
+                    state.velocity_samples.push_back((now, pos.x));
                     if state.animator.is_animating() || state.settle_target_page.is_some() {
                         state.animator.stop();
                         state.settle_target_page = None;
                         state.pointer_down = true;
                         state.start_x = pos.x - state.drag_offset;
                         state.last_x = pos.x;
-                        state.last_move_time = Some(Instant::now());
+                        state.last_move_time = Some(now);
                         state.velocity_x = 0.0;
                         state.is_dragging = true;
                         state.has_dragged = true;
@@ -379,7 +389,7 @@ where
                         state.pointer_down = true;
                         state.start_x = pos.x;
                         state.last_x = pos.x;
-                        state.last_move_time = Some(Instant::now());
+                        state.last_move_time = Some(now);
                         state.velocity_x = 0.0;
                         state.drag_offset = 0.0;
                         state.is_dragging = false;
@@ -389,13 +399,16 @@ where
             }
             Event::Touch(touch::Event::FingerPressed { position, .. }) => {
                 if bounds.contains(*position) {
+                    let now = Instant::now();
+                    state.velocity_samples.clear();
+                    state.velocity_samples.push_back((now, position.x));
                     if state.animator.is_animating() || state.settle_target_page.is_some() {
                         state.animator.stop();
                         state.settle_target_page = None;
                         state.pointer_down = true;
                         state.start_x = position.x - state.drag_offset;
                         state.last_x = position.x;
-                        state.last_move_time = Some(Instant::now());
+                        state.last_move_time = Some(now);
                         state.velocity_x = 0.0;
                         state.is_dragging = true;
                         state.has_dragged = true;
@@ -404,7 +417,7 @@ where
                         state.pointer_down = true;
                         state.start_x = position.x;
                         state.last_x = position.x;
-                        state.last_move_time = Some(Instant::now());
+                        state.last_move_time = Some(now);
                         state.velocity_x = 0.0;
                         state.drag_offset = 0.0;
                         state.is_dragging = false;
@@ -415,6 +428,13 @@ where
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
                 if state.pointer_down {
                     let now = Instant::now();
+                    state.velocity_samples.push_back((now, position.x));
+                    while state.velocity_samples.len() > 10
+                        || state.velocity_samples.front().is_some_and(|(t, _)| now.duration_since(*t).as_millis() > 150)
+                    {
+                        state.velocity_samples.pop_front();
+                    }
+
                     if let Some(last_time) = state.last_move_time {
                         let dt = now.duration_since(last_time).as_secs_f32();
                         if dt > 0.001 {
@@ -452,13 +472,22 @@ where
                         };
 
                         state.drag_offset = effective_delta;
-                        shell.request_redraw();
+                        if self.interactive {
+                            shell.request_redraw();
+                        }
                     }
                 }
             }
             Event::Touch(touch::Event::FingerMoved { position, .. }) => {
                 if state.pointer_down {
                     let now = Instant::now();
+                    state.velocity_samples.push_back((now, position.x));
+                    while state.velocity_samples.len() > 10
+                        || state.velocity_samples.front().is_some_and(|(t, _)| now.duration_since(*t).as_millis() > 150)
+                    {
+                        state.velocity_samples.pop_front();
+                    }
+
                     if let Some(last_time) = state.last_move_time {
                         let dt = now.duration_since(last_time).as_secs_f32();
                         if dt > 0.001 {
@@ -495,15 +524,34 @@ where
                         };
 
                         state.drag_offset = effective_delta;
-                        shell.request_redraw();
+                        if self.interactive {
+                            shell.request_redraw();
+                        }
                     }
                 }
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 if state.pointer_down {
+                    let now = Instant::now();
                     state.pointer_down = false;
                     let had_dragged = state.has_dragged;
                     let offset = state.drag_offset;
+
+                    // Robust windowed velocity calculation (last 100-150ms)
+                    if state.velocity_samples.len() >= 2 {
+                        let (first_t, first_x) = *state.velocity_samples.front().unwrap();
+                        let (last_t, last_x) = *state.velocity_samples.back().unwrap();
+                        let dt = last_t.duration_since(first_t).as_secs_f32();
+                        if dt > 0.010 {
+                            let window_v = (last_x - first_x) / dt;
+                            let pause_dur = now.duration_since(last_t).as_secs_f32();
+                            if pause_dur > 0.080 {
+                                state.velocity_x = 0.0;
+                            } else {
+                                state.velocity_x = window_v;
+                            }
+                        }
+                    }
 
                     if had_dragged {
                         self.start_settle(state, bounds.width, current_page, page_count, offset, shell);
@@ -512,8 +560,25 @@ where
             }
             Event::Touch(touch::Event::FingerLifted { position, .. }) => {
                 if state.pointer_down {
+                    let now = Instant::now();
                     state.pointer_down = false;
                     let had_dragged = state.has_dragged;
+
+                    // Robust windowed velocity calculation (last 100-150ms)
+                    if state.velocity_samples.len() >= 2 {
+                        let (first_t, first_x) = *state.velocity_samples.front().unwrap();
+                        let (last_t, last_x) = *state.velocity_samples.back().unwrap();
+                        let dt = last_t.duration_since(first_t).as_secs_f32();
+                        if dt > 0.010 {
+                            let window_v = (last_x - first_x) / dt;
+                            let pause_dur = now.duration_since(last_t).as_secs_f32();
+                            if pause_dur > 0.080 {
+                                state.velocity_x = 0.0;
+                            } else {
+                                state.velocity_x = window_v;
+                            }
+                        }
+                    }
 
                     if had_dragged {
                         let can_prev = current_page > 0;
@@ -583,7 +648,10 @@ where
 
         // Calculate offset and adjusted cursor for child views
         let base_x = current_page as f32 * bounds.width;
-        let offset_x = if self.interactive || state.settle_target_page.is_some() {
+        let offset_x = if self.interactive
+            || (state.settle_target_page.is_some()
+                && state.settle_target_page != Some(current_page))
+        {
             state.drag_offset
         } else {
             0.0
@@ -631,7 +699,7 @@ where
             // During drag, capture the movement event so parent/system does not interfere
             shell.capture_event();
         } else if is_release {
-            if state.has_dragged {
+            if was_dragged {
                 // If this gesture was a drag (even if user slid back to origin),
                 // suppress release to children so buttons never trigger false clicks.
                 let cancel = Event::Touch(touch::Event::FingerLost {
@@ -725,7 +793,10 @@ where
         let bounds = layout.bounds();
         let current_page = self.current_page.min(self.pages.len().saturating_sub(1));
         let base_x = current_page as f32 * bounds.width;
-        let offset_x = if self.interactive || state.settle_target_page.is_some() {
+        let offset_x = if self.interactive
+            || (state.settle_target_page.is_some()
+                && state.settle_target_page != Some(current_page))
+        {
             state.drag_offset
         } else {
             0.0
@@ -778,7 +849,10 @@ where
         let state = tree.state.downcast_ref::<State>();
         let current_page = self.current_page.min(self.pages.len().saturating_sub(1));
         let base_x = current_page as f32 * bounds.width;
-        let offset_x = if self.interactive || state.settle_target_page.is_some() {
+        let offset_x = if self.interactive
+            || (state.settle_target_page.is_some()
+                && state.settle_target_page != Some(current_page))
+        {
             state.drag_offset
         } else {
             0.0

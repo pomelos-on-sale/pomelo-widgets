@@ -280,3 +280,31 @@
             prev_offset = cur_offset;
         }
     }
+
+    #[test]
+    fn pager_diff_resets_settle_state_when_current_page_reaches_target() {
+        use iced::advanced::Widget;
+
+        let pages_0: Vec<Element<'_, usize, iced::Theme>> =
+            vec![text("Page 1").into(), text("Page 2").into()];
+        let p0 = pager(pages_0).current_page(0).on_change(|page| page);
+        let mut tree = Tree::new(&p0 as &dyn Widget<usize, iced::Theme, ()>);
+
+        // Simulate release settling to target page 1
+        {
+            let state = tree.state.downcast_mut::<State>();
+            state.settle_target_page = Some(1);
+            state.drag_offset = -400.0;
+        }
+
+        // When parent rebuilds and diffs with current_page == 1
+        let pages_1: Vec<Element<'_, usize, iced::Theme>> =
+            vec![text("Page 1").into(), text("Page 2").into()];
+        let p1 = pager(pages_1).current_page(1).on_change(|page| page);
+        p1.diff(&mut tree);
+
+        let state = tree.state.downcast_ref::<State>();
+        assert_eq!(state.settle_target_page, None);
+        assert_eq!(state.drag_offset, 0.0);
+    }
+
