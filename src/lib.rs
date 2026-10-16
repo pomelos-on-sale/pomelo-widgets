@@ -28,6 +28,7 @@
 
 pub mod animation;
 pub mod app;
+pub mod card;
 pub mod dialog;
 pub mod gesture;
 pub mod pager;
@@ -35,7 +36,8 @@ pub mod preferences;
 pub mod touch_keyboard;
 
 pub use animation::{AnimationController, Curve};
-pub use app::{AppIcon, AppMeta, BitmapIcon};
+pub use app::{interval_stream, AppIcon, AppMeta, AppPreferences, BitmapIcon};
+pub use card::{card_separator, card_surface, detail_row, CARD_BORDER_WIDTH, CARD_PADDING, CARD_RADIUS};
 pub use dialog::{
     dialog_box, dialog_button, dialog_cancel_button, dialog_card, dialog_confirm_button,
     dialog_danger_button, modal_dialog, DialogButtonStyle,

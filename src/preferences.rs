@@ -150,6 +150,38 @@ impl ThemeMode {
             Self::Light => Color::from_rgba8(0, 0, 0, 15.0 / 255.0),
         }
     }
+
+    /// System accent / action color (iOS system blue).
+    pub fn accent(self) -> Color {
+        match self {
+            Self::Dark => Color::from_rgb8(10, 132, 255),
+            Self::Light => Color::from_rgb8(0, 122, 255),
+        }
+    }
+
+    /// System danger / destructive action color (iOS system red).
+    pub fn danger(self) -> Color {
+        match self {
+            Self::Dark => Color::from_rgb8(255, 69, 58),
+            Self::Light => Color::from_rgb8(255, 59, 48),
+        }
+    }
+
+    /// System success / positive state color (iOS system green).
+    pub fn success(self) -> Color {
+        match self {
+            Self::Dark => Color::from_rgb8(48, 209, 88),
+            Self::Light => Color::from_rgb8(52, 199, 89),
+        }
+    }
+
+    /// System warning / attention color (iOS system orange).
+    pub fn warning(self) -> Color {
+        match self {
+            Self::Dark => Color::from_rgb8(255, 159, 10),
+            Self::Light => Color::from_rgb8(255, 149, 0),
+        }
+    }
 }
 
 /// The font size tier for primary body text.
