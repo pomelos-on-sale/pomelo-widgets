@@ -209,6 +209,9 @@ pub enum FontSizeTier {
     Large,
 }
 
+/// Alias for [`FontSizeTier`].
+pub type FontTier = FontSizeTier;
+
 impl FontSizeTier {
     pub const COMPACT: Self = Self::ExtraSmall;
 

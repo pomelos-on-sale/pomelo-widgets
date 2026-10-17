@@ -13,7 +13,7 @@ use iced::widget::{button, container, opaque, text, Column, Row, Space};
 use iced::{Border, Color, Element, Length, Padding, Shadow};
 use pomelo_material_symbols::Icon;
 
-use crate::preferences::{FontSizeTier, ThemeMode};
+use crate::preferences::{FontTier, ThemeMode};
 
 /// The default proportion of the screen height occupied by an [`ActionSheet`] (100%).
 pub const ACTION_SHEET_HEIGHT_RATIO: f32 = 1.0;
@@ -24,17 +24,17 @@ pub const CAPSULE_BUTTON_WIDTH: f32 = 72.0;
 /// Height of the top capsule action buttons (matching Pomelo OS capsule navigation button: 48px).
 pub const CAPSULE_BUTTON_HEIGHT: f32 = 48.0;
 /// Glyph font size for top capsule action buttons.
-pub const CAPSULE_BUTTON_GLYPH: f32 = FontSizeTier::Standard.base_size(); // 24.0 px
-/// Title font size for top capsule navigation bar in an [`ActionSheet`] (standard Small tier: 20px).
-pub const TOP_BAR_TITLE_FONT: f32 = FontSizeTier::Small.base_size();
-/// Top bar icon size in an [`ActionSheet`] (standard Small tier: 20px).
-pub const TOP_BAR_ICON: f32 = FontSizeTier::Small.base_size();
-/// Title font size for the centered body title in an [`ActionSheet`] (standard Small tier: 20px).
-pub const BODY_TITLE_FONT: f32 = FontSizeTier::Small.base_size();
+pub const CAPSULE_BUTTON_GLYPH: f32 = FontTier::Standard.base_size(); // 24.0 px
+/// Title font size for top capsule navigation bar in an [`ActionSheet`] (standard Standard tier: 24px).
+pub const TOP_BAR_TITLE_FONT: f32 = FontTier::Standard.base_size();
+/// Top bar icon size in an [`ActionSheet`] (standard Standard tier: 24px).
+pub const TOP_BAR_ICON: f32 = FontTier::Standard.base_size();
+/// Title font size for the centered body title in an [`ActionSheet`] (standard Standard tier: 24px).
+pub const BODY_TITLE_FONT: f32 = FontTier::Standard.base_size();
 /// Icon size for the centered body title in an [`ActionSheet`] (standard Standard tier: 24px).
-pub const BODY_TITLE_ICON: f32 = FontSizeTier::Standard.base_size();
-/// Message font size for the centered body text in an [`ActionSheet`] (standard ExtraSmall tier: 18px).
-pub const BODY_MESSAGE_FONT: f32 = FontSizeTier::ExtraSmall.base_size();
+pub const BODY_TITLE_ICON: f32 = FontTier::Standard.base_size();
+/// Message font size for the centered body text in an [`ActionSheet`] (standard Standard tier: 24px).
+pub const BODY_MESSAGE_FONT: f32 = FontTier::Standard.base_size();
 
 /// Visual style of an action button within an [`ActionSheet`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -115,6 +115,7 @@ pub struct ActionSheet<'a, Message> {
     pub actions: Vec<ActionItem<Message>>,
     pub cancel: Option<ActionItem<Message>>,
     pub theme: ThemeMode,
+    pub font_tier: FontTier,
 }
 
 impl<'a, Message> std::fmt::Debug for ActionSheet<'a, Message> {
@@ -128,12 +129,13 @@ impl<'a, Message> std::fmt::Debug for ActionSheet<'a, Message> {
             .field("actions_count", &self.actions.len())
             .field("has_cancel", &self.cancel.is_some())
             .field("theme", &self.theme)
+            .field("font_tier", &self.font_tier)
             .finish()
     }
 }
 
 impl<'a, Message> ActionSheet<'a, Message> {
-    /// Creates a new empty [`ActionSheet`] with the given theme.
+    /// Creates a new empty [`ActionSheet`] with the given theme and standard font tier ([`FontTier::Standard`]).
     pub fn new(theme: ThemeMode) -> Self {
         Self {
             title: None,
@@ -144,7 +146,14 @@ impl<'a, Message> ActionSheet<'a, Message> {
             actions: Vec::new(),
             cancel: None,
             theme,
+            font_tier: FontTier::Standard,
         }
+    }
+
+    /// Sets the font tier for this [`ActionSheet`]. Defaults to [`FontTier::Standard`].
+    pub fn font_tier(mut self, tier: FontTier) -> Self {
+        self.font_tier = tier;
+        self
     }
 
     /// Sets the title text.
@@ -282,6 +291,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
     where
         Message: Clone + 'a,
     {
+        let font_size = self.font_tier.base_size();
         let mut top_bar = Row::new()
             .width(Length::Fill)
             .align_y(iced::Alignment::Center);
@@ -314,7 +324,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
             if let Some(icon) = self.title_icon {
                 title_row = title_row.push(
                     crate::icon(icon)
-                        .size(TOP_BAR_ICON)
+                        .size(font_size)
                         .color(self.theme.accent()),
                 );
             }
@@ -322,7 +332,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
             if let Some(title) = &self.title {
                 title_row = title_row.push(
                     text(title.clone())
-                        .size(TOP_BAR_TITLE_FONT)
+                        .size(font_size)
                         .color(self.theme.text_primary()),
                 );
             }
@@ -398,7 +408,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
                 if let Some(icon) = self.title_icon {
                     title_row = title_row.push(
                         crate::icon(icon)
-                            .size(BODY_TITLE_ICON)
+                            .size(font_size)
                             .color(self.theme.accent()),
                     );
                 }
@@ -406,7 +416,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
                 if let Some(title) = &self.title {
                     title_row = title_row.push(
                         text(title.clone())
-                            .size(BODY_TITLE_FONT)
+                            .size(font_size)
                             .color(self.theme.text_primary()),
                     );
                 }
@@ -417,7 +427,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
             if let Some(msg) = &self.message {
                 body_col = body_col.push(
                     text(msg.clone())
-                        .size(BODY_MESSAGE_FONT)
+                        .size(font_size)
                         .color(self.theme.text_secondary())
                         .align_x(iced::alignment::Horizontal::Center),
                 );
@@ -628,5 +638,16 @@ mod tests {
             .cancel_item(ActionItem::secondary("Cancel", 0).icon(Icon::CLOSE))
             .custom_body(text("Custom Input Widget"));
         let _elem: Element<'_, usize> = sheet.view();
+    }
+
+    #[test]
+    fn action_sheet_font_tier_defaults_to_standard() {
+        let sheet: ActionSheet<usize> = ActionSheet::new(ThemeMode::Dark);
+        assert_eq!(sheet.font_tier, FontTier::Standard);
+        assert_eq!(sheet.font_tier.base_size(), 24.0);
+
+        let custom_tier_sheet = sheet.font_tier(FontTier::Small);
+        assert_eq!(custom_tier_sheet.font_tier, FontTier::Small);
+        assert_eq!(custom_tier_sheet.font_tier.base_size(), 20.0);
     }
 }
