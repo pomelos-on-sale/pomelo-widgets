@@ -25,6 +25,11 @@ pub enum Language {
 }
 
 impl Language {
+    /// All available language options.
+    pub const ALL: [Self; 2] = [Self::Chinese, Self::English];
+    /// Alias for [`ALL`].
+    pub const OPTIONS: [Self; 2] = Self::ALL;
+
     /// Returns the other language, for toggle actions.
     #[inline]
     pub fn other(self) -> Self {

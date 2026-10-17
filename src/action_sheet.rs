@@ -13,7 +13,7 @@ use iced::widget::{button, container, opaque, text, Column, Row, Space};
 use iced::{Border, Color, Element, Length, Padding, Shadow};
 use pomelo_material_symbols::Icon;
 
-use crate::preferences::ThemeMode;
+use crate::preferences::{FontSizeTier, ThemeMode};
 
 /// The default proportion of the screen height occupied by an [`ActionSheet`] (100%).
 pub const ACTION_SHEET_HEIGHT_RATIO: f32 = 1.0;
@@ -24,7 +24,17 @@ pub const CAPSULE_BUTTON_WIDTH: f32 = 72.0;
 /// Height of the top capsule action buttons (matching Pomelo OS capsule navigation button: 48px).
 pub const CAPSULE_BUTTON_HEIGHT: f32 = 48.0;
 /// Glyph font size for top capsule action buttons.
-pub const CAPSULE_BUTTON_GLYPH: f32 = 24.0;
+pub const CAPSULE_BUTTON_GLYPH: f32 = FontSizeTier::Standard.base_size(); // 24.0 px
+/// Title font size for top capsule navigation bar in an [`ActionSheet`] (standard Small tier: 20px).
+pub const TOP_BAR_TITLE_FONT: f32 = FontSizeTier::Small.base_size();
+/// Top bar icon size in an [`ActionSheet`] (standard Small tier: 20px).
+pub const TOP_BAR_ICON: f32 = FontSizeTier::Small.base_size();
+/// Title font size for the centered body title in an [`ActionSheet`] (standard Small tier: 20px).
+pub const BODY_TITLE_FONT: f32 = FontSizeTier::Small.base_size();
+/// Icon size for the centered body title in an [`ActionSheet`] (standard Standard tier: 24px).
+pub const BODY_TITLE_ICON: f32 = FontSizeTier::Standard.base_size();
+/// Message font size for the centered body text in an [`ActionSheet`] (standard ExtraSmall tier: 18px).
+pub const BODY_MESSAGE_FONT: f32 = FontSizeTier::ExtraSmall.base_size();
 
 /// Visual style of an action button within an [`ActionSheet`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -304,7 +314,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
             if let Some(icon) = self.title_icon {
                 title_row = title_row.push(
                     crate::icon(icon)
-                        .size(20)
+                        .size(TOP_BAR_ICON)
                         .color(self.theme.accent()),
                 );
             }
@@ -312,7 +322,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
             if let Some(title) = &self.title {
                 title_row = title_row.push(
                     text(title.clone())
-                        .size(17)
+                        .size(TOP_BAR_TITLE_FONT)
                         .color(self.theme.text_primary()),
                 );
             }
@@ -388,7 +398,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
                 if let Some(icon) = self.title_icon {
                     title_row = title_row.push(
                         crate::icon(icon)
-                            .size(22)
+                            .size(BODY_TITLE_ICON)
                             .color(self.theme.accent()),
                     );
                 }
@@ -396,7 +406,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
                 if let Some(title) = &self.title {
                     title_row = title_row.push(
                         text(title.clone())
-                            .size(18)
+                            .size(BODY_TITLE_FONT)
                             .color(self.theme.text_primary()),
                     );
                 }
@@ -407,7 +417,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
             if let Some(msg) = &self.message {
                 body_col = body_col.push(
                     text(msg.clone())
-                        .size(15)
+                        .size(BODY_MESSAGE_FONT)
                         .color(self.theme.text_secondary())
                         .align_x(iced::alignment::Horizontal::Center),
                 );

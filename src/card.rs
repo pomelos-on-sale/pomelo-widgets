@@ -2,7 +2,10 @@
 
 use iced::widget::{container, rule, text, Row, Space};
 use iced::{Alignment, Border, Element, Length, Padding};
-use crate::preferences::ThemeMode;
+use crate::preferences::{FontSizeTier, ThemeMode};
+
+/// Default font size for key-value detail rows (standard Small tier: 20px).
+pub const DETAIL_FONT: f32 = FontSizeTier::Small.base_size();
 
 /// Default corner radius for standard cards (16px).
 pub const CARD_RADIUS: f32 = 16.0;
@@ -59,13 +62,13 @@ pub fn detail_row<'a, Message: 'a>(
         .align_y(Alignment::Center)
         .push(
             text(key_str)
-                .size(16.0)
+                .size(DETAIL_FONT)
                 .color(theme.text_secondary()),
         )
         .push(Space::new().width(Length::Fill))
         .push(
             text(val_str)
-                .size(16.0)
+                .size(DETAIL_FONT)
                 .color(theme.text_primary()),
         );
 

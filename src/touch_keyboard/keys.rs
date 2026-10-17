@@ -183,9 +183,10 @@ const DOT_PORTION: u16 = KEY_PORTION;
 /// Return, the original's `key_w * 1.8`.
 const ENTER_PORTION: u16 = 180;
 
-/// The two label sizes. Absolute, like all the type in this repository: a key's label does not
-/// follow the box it is in — the number is what the 480 px design panel ends at, and both are the
-/// sizes the platform bakes glyphs for.
+/// The label sizes for touch keyboard keys. Absolute pixels tuned for the compact 4-row keyboard band:
+/// - [`CHAR_FONT`]: Standard 24px character key typography (matches [`FontSizeTier::Standard`]).
+/// - [`SPEC_FONT`]: Compact 16px font for multi-character modifier keys (e.g. "#+=", "123").
+/// - [`ICON_FONT`]: 22px icon glyph size for shift and backspace.
 pub const CHAR_FONT: f32 = 24.0;
 pub const SPEC_FONT: f32 = 16.0;
 pub const ICON_FONT: f32 = 22.0;

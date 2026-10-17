@@ -9,7 +9,10 @@
 use iced::widget::{button, container, opaque, text, Column, Space};
 use iced::{Border, Color, Element, Length, Shadow};
 
-use crate::preferences::ThemeMode;
+use crate::preferences::{FontSizeTier, ThemeMode};
+
+/// The standard dialog action button font size (standard Small tier: 20px).
+pub const BUTTON_FONT: f32 = FontSizeTier::Small.base_size();
 
 /// The standard dialog box width in pixels (centered on 480 px panels).
 pub const DIALOG_WIDTH: f32 = 360.0;
@@ -130,7 +133,7 @@ pub fn dialog_button<'a, Message: 'a + Clone>(
     button(
         container(
             text(label_str)
-                .size(17.0)
+                .size(BUTTON_FONT)
                 .color(text_color),
         )
         .width(Length::Fill)

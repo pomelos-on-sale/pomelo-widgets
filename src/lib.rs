@@ -38,10 +38,14 @@ pub mod touch_keyboard;
 
 pub use action_sheet::{
     ActionItem, ActionSheet, ActionStyle, ACTION_SHEET_HEIGHT, ACTION_SHEET_HEIGHT_RATIO,
+    BODY_MESSAGE_FONT, BODY_TITLE_FONT, BODY_TITLE_ICON, TOP_BAR_ICON, TOP_BAR_TITLE_FONT,
 };
 pub use animation::{AnimationController, Curve};
 pub use app::{interval_stream, AppIcon, AppMeta, AppPreferences, BitmapIcon};
-pub use card::{card_separator, card_surface, detail_row, CARD_BORDER_WIDTH, CARD_PADDING, CARD_RADIUS};
+pub use card::{
+    card_separator, card_surface, detail_row, CARD_BORDER_WIDTH, CARD_PADDING, CARD_RADIUS,
+    DETAIL_FONT,
+};
 #[allow(deprecated)]
 pub use dialog::{
     dialog_box, dialog_button, dialog_cancel_button, dialog_card, dialog_confirm_button,
