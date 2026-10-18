@@ -34,6 +34,8 @@ pub mod dialog;
 pub mod gesture;
 pub mod pager;
 pub mod preferences;
+pub mod opaque;
+pub mod toast;
 pub mod touch_keyboard;
 
 pub use action_sheet::{
@@ -46,18 +48,22 @@ pub use card::{
     card_separator, card_surface, detail_row, CARD_BORDER_WIDTH, CARD_PADDING, CARD_RADIUS,
     DETAIL_FONT,
 };
-#[allow(deprecated)]
 pub use dialog::{
-    dialog_box, dialog_button, dialog_cancel_button, dialog_card, dialog_confirm_button,
-    dialog_danger_button, modal_dialog, DialogButtonStyle,
+    confirm_dialog, dialog_box, dialog_button, dialog_cancel_button, dialog_card,
+    dialog_confirm_button, dialog_danger_button, modal_dialog, DialogButtonStyle,
 };
 pub use gesture::{
     drag_disambiguator, gesture_detector, DragDisambiguator, GestureDetector, PanEndDetails,
     PanStartDetails, PanUpdateDetails, SwipeDirection,
 };
+pub use opaque::opaque;
 pub use pager::{pager, Pager};
 pub use pomelo_material_symbols;
 pub use preferences::{FontSizeTier, FontTier, Language, SleepTimeout, SystemPreferences, ThemeMode};
+pub use toast::{
+    toast_view, Toast, TOAST_BOTTOM_MARGIN, TOAST_DURATION, TOAST_FONT_SIZE, TOAST_MAX_WIDTH,
+    TOAST_PADDING, TOAST_RADIUS,
+};
 
 /// Builds an icon text widget from [`pomelo_material_symbols::Icon`] styled with Material Symbols.
 ///

@@ -6,9 +6,10 @@
 //! - Semi-transparent dimmed backdrop blocking background touches
 //! - Standard button heights (44 px), borders, and press-state shading
 
-use iced::widget::{button, container, opaque, text, Column, Space};
+use iced::widget::{button, container, text, Column, Row, Space};
 use iced::{Border, Color, Element, Length, Shadow};
 
+use crate::opaque::opaque;
 use crate::preferences::{FontSizeTier, ThemeMode};
 
 /// The standard dialog action button font size (standard Small tier: 20px).
@@ -82,7 +83,6 @@ pub fn dialog_card<'a, Message: 'a>(
 }
 
 /// Standard 360 px modal dialog box with card background, border, title, body, and action buttons.
-#[deprecated(note = "Centered dialogs are forbidden in Pomelo OS. Use ActionSheet instead.")]
 pub fn dialog_box<'a, Message: 'a>(
     title: impl Into<Element<'a, Message>>,
     body: impl Into<Element<'a, Message>>,
@@ -99,6 +99,44 @@ pub fn dialog_box<'a, Message: 'a>(
     .width(Length::Fill);
 
     modal_dialog(dialog_card(dialog_content, theme))
+}
+
+/// Builds a standard centered confirmation modal dialog.
+///
+/// Features a title, a body/description message, and two action buttons:
+/// a Cancel button and a Confirm button (either Primary or Danger).
+pub fn confirm_dialog<'a, Message: 'a + Clone>(
+    title: impl Into<String>,
+    description: impl Into<String>,
+    confirm_label: impl Into<String>,
+    on_confirm: Message,
+    cancel_label: impl Into<String>,
+    on_cancel: Message,
+    is_destructive: bool,
+    theme: ThemeMode,
+) -> Element<'a, Message> {
+    let title_text = text(title.into())
+        .size(FontSizeTier::Standard.base_size())
+        .color(theme.text_primary());
+
+    let body_text = text(description.into())
+        .size(FontSizeTier::Small.base_size())
+        .color(theme.text_secondary())
+        .wrapping(text::Wrapping::Word);
+
+    let cancel_btn = dialog_cancel_button(cancel_label, on_cancel, theme);
+
+    let confirm_btn = if is_destructive {
+        dialog_danger_button(confirm_label, on_confirm, theme)
+    } else {
+        dialog_confirm_button(confirm_label, on_confirm, theme)
+    };
+
+    let actions = Row::with_children(vec![cancel_btn, confirm_btn])
+        .spacing(12.0)
+        .width(Length::Fill);
+
+    dialog_box(title_text, body_text, actions, theme)
 }
 
 /// Visual style for dialog action buttons.
@@ -248,7 +286,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn dialog_box_builds_without_panic() {
         let title = text("Title");
         let body = text("Body description");
@@ -257,5 +294,19 @@ mod tests {
             dialog_confirm_button("OK", 1usize, ThemeMode::Dark),
         ]);
         let _dlg: Element<'_, usize> = dialog_box(title, body, actions, ThemeMode::Dark);
+    }
+
+    #[test]
+    fn confirm_dialog_builds_without_panic() {
+        let _dlg: Element<'_, usize> = confirm_dialog(
+            "Title",
+            "Are you sure?",
+            "Yes",
+            1usize,
+            "No",
+            0usize,
+            true,
+            ThemeMode::Dark,
+        );
     }
 }

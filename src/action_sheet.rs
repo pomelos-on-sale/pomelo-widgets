@@ -9,10 +9,11 @@
 //! - Strict typing ensuring modals in applications are structured as ActionSheets rather than arbitrary dialogs.
 
 use iced::border::Radius;
-use iced::widget::{button, container, opaque, text, Column, Row, Space};
+use iced::widget::{button, container, text, Column, Row, Space};
 use iced::{Border, Color, Element, Length, Padding, Shadow};
 use pomelo_material_symbols::Icon;
 
+use crate::opaque::opaque;
 use crate::preferences::{FontTier, ThemeMode};
 
 /// The default proportion of the screen height occupied by an [`ActionSheet`] (100%).
