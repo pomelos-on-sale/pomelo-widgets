@@ -116,6 +116,14 @@ impl ThemeMode {
         }
     }
 
+    /// Pressed card row / tile background color.
+    pub fn card_pressed(self) -> Color {
+        match self {
+            Self::Dark => Color::from_rgb8(44, 44, 46),
+            Self::Light => Color::from_rgb8(229, 229, 234),
+        }
+    }
+
     /// Navigation bar background color.
     pub fn nav_bar(self) -> Color {
         match self {

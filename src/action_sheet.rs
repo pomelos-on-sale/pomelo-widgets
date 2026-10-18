@@ -9,7 +9,8 @@
 //! - Strict typing ensuring modals in applications are structured as ActionSheets rather than arbitrary dialogs.
 
 use iced::border::Radius;
-use iced::widget::{button, container, text, Column, Row, Space};
+use iced::widget::scrollable::{Direction, Scrollbar};
+use iced::widget::{button, container, scrollable, text, Column, Row, Space};
 use iced::{Border, Color, Element, Length, Padding, Shadow};
 use pomelo_material_symbols::Icon;
 
@@ -393,7 +394,6 @@ impl<'a, Message> ActionSheet<'a, Message> {
             let padding = self.body_padding.unwrap_or(Padding::ZERO);
             container(custom)
                 .width(Length::Fill)
-                .height(Length::Fill)
                 .padding(padding)
         } else {
             let mut body_col = Column::new()
@@ -443,15 +443,18 @@ impl<'a, Message> ActionSheet<'a, Message> {
 
             container(body_col)
                 .width(Length::Fill)
-                .height(Length::Fill)
                 .center_x(Length::Fill)
-                .center_y(Length::Fill)
                 .padding(padding)
         };
 
+        let body_scrollable = scrollable(body_container)
+            .direction(Direction::Vertical(Scrollbar::hidden()))
+            .width(Length::Fill)
+            .height(Length::Fill);
+
         let sheet_content = Column::with_children(vec![
             top_container.into(),
-            body_container.into(),
+            body_scrollable.into(),
         ])
         .width(Length::Fill)
         .height(Length::Fill);
@@ -492,7 +495,7 @@ impl<'a, Message> ActionSheet<'a, Message> {
 }
 
 /// Helper function to build a standard top capsule action button (72×48, radius 24).
-fn capsule_icon_button<'a, Message: Clone + 'a>(
+pub fn capsule_icon_button<'a, Message: Clone + 'a>(
     icon: Icon,
     message: Option<Message>,
     style: ActionStyle,
