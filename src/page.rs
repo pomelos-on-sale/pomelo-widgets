@@ -87,13 +87,22 @@ pub fn page_with_modal<'a, Message: 'a>(
     Page::new(head, body).push_opt(modal)
 }
 
-/// Convenience helper to create a stacked page with an optional modal ActionSheet.
+/// Convenience helper to create a stacked page with an optional modal [`SubPage`].
+pub fn page_with_sub_page<'a, Message: Clone + 'a>(
+    head: impl Into<Element<'a, Message>>,
+    body: impl Into<Element<'a, Message>>,
+    sub_page: Option<crate::sub_page::SubPage<'a, Message>>,
+) -> Page<'a, Message> {
+    Page::new(head, body).push_opt(sub_page)
+}
+
+/// Backward-compatible alias for [`page_with_sub_page`].
 pub fn page_with_sheet<'a, Message: Clone + 'a>(
     head: impl Into<Element<'a, Message>>,
     body: impl Into<Element<'a, Message>>,
-    sheet: Option<crate::action_sheet::ActionSheet<'a, Message>>,
+    sheet: Option<crate::sub_page::SubPage<'a, Message>>,
 ) -> Page<'a, Message> {
-    Page::new(head, body).push_opt(sheet)
+    page_with_sub_page(head, body, sheet)
 }
 
 #[cfg(test)]
