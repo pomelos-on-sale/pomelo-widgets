@@ -59,7 +59,9 @@ pub use gesture::{
 pub use opaque::opaque;
 pub use pager::{pager, Pager};
 pub use pomelo_material_symbols;
-pub use preferences::{FontSizeTier, FontTier, Language, SleepTimeout, SystemPreferences, ThemeMode};
+pub use preferences::{
+    FontSizeTier, FontTier, Language, ScreenOffTimeout, SleepTimeout, SystemPreferences, ThemeMode,
+};
 pub use toast::{
     toast_view, Toast, TOAST_BOTTOM_MARGIN, TOAST_DURATION, TOAST_FONT_SIZE, TOAST_MAX_WIDTH,
     TOAST_PADDING, TOAST_RADIUS,
