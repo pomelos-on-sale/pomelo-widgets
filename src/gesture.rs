@@ -5,6 +5,16 @@
 //! - Continuous pan/drag gestures with delta and velocity tracking
 //! - Directional swipe gestures (Left, Right, Up, Down)
 //! - Gesture disambiguation (suppressing child clicks when a drag is recognized)
+//! - Gesture Arena coordination ([`GestureScope`], [`GestureArenaManager`])
+
+pub mod arena;
+pub mod scope;
+
+pub use arena::{
+    set_arena_context, with_arena, ArenaEntry, GestureArenaManager, GestureArenaMember,
+    GestureDisposition, MemberId, PointerId,
+};
+pub use scope::{gesture_scope, GestureScope, ScopeState};
 
 use std::time::Instant;
 
@@ -246,7 +256,7 @@ pub fn gesture_detector<'a, Message, Theme, Renderer>(
 }
 
 /// Internal state of the gesture detector.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct State {
     pointer_down: bool,
     start_pos: Point,
@@ -257,6 +267,24 @@ struct State {
     has_dragged: bool,
     last_tap_time: Option<Instant>,
     last_tap_pos: Option<Point>,
+    member_id: MemberId,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            pointer_down: false,
+            start_pos: Point::ORIGIN,
+            last_pos: Point::ORIGIN,
+            start_time: None,
+            last_time: None,
+            is_dragging: false,
+            has_dragged: false,
+            last_tap_time: None,
+            last_tap_pos: None,
+            member_id: MemberId::next(),
+        }
+    }
 }
 
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -348,12 +376,17 @@ where
                     state.is_dragging = false;
                     state.has_dragged = false;
 
+                    with_arena(|arena| {
+                        arena.add_member(PointerId::MOUSE_LEFT, state.member_id);
+                        arena.claim(PointerId::MOUSE_LEFT);
+                    });
+
                     if let Some(on_press) = &self.on_press {
                         shell.publish(on_press(pos));
                     }
                 }
             }
-            Event::Touch(touch::Event::FingerPressed { position, .. }) => {
+            Event::Touch(touch::Event::FingerPressed { id, position }) => {
                 if bounds.contains(*position) {
                     let now = Instant::now();
                     state.pointer_down = true;
@@ -363,6 +396,12 @@ where
                     state.last_time = Some(now);
                     state.is_dragging = false;
                     state.has_dragged = false;
+
+                    with_arena(|arena| {
+                        let ptr = PointerId::touch(id.0);
+                        arena.add_member(ptr, state.member_id);
+                        arena.claim(ptr);
+                    });
 
                     if let Some(on_press) = &self.on_press {
                         shell.publish(on_press(*position));
@@ -556,6 +595,11 @@ where
                         state.is_dragging = false;
                         if let Some(on_pan_cancel) = &self.on_pan_cancel {
                             shell.publish(on_pan_cancel.clone());
+                        } else if let Some(on_pan_end) = &self.on_pan_end {
+                            shell.publish(on_pan_end(PanEndDetails {
+                                velocity: Vector::ZERO,
+                                total_delta: Vector::ZERO,
+                            }));
                         }
                     }
                 }
@@ -570,6 +614,14 @@ where
         );
 
         if just_started_dragging {
+            let pointer = match event {
+                Event::Touch(touch::Event::FingerMoved { id, .. }) => PointerId::touch(id.0),
+                _ => PointerId::MOUSE_LEFT,
+            };
+            with_arena(|arena| {
+                arena.resolve(pointer, state.member_id, GestureDisposition::Accepted);
+            });
+
             if self.intercept_events {
                 let cancel = Event::Touch(touch::Event::FingerLost {
                     id: touch::Finger(0),
@@ -622,6 +674,9 @@ where
                     shell,
                     viewport,
                 );
+                if self.intercept_events {
+                    shell.capture_event();
+                }
             }
         } else {
             self.content.as_widget_mut().update(
@@ -634,6 +689,9 @@ where
                 shell,
                 viewport,
             );
+            if state.pointer_down && self.intercept_events {
+                shell.capture_event();
+            }
         }
     }
 
@@ -1295,6 +1353,208 @@ mod tests {
 
         // Genuine tap: MUST emit the button's message!
         assert_eq!(messages, vec![99usize]);
+    }
+
+    #[test]
+    fn gesture_scope_captures_press_inside_detector() {
+        use iced::widget::button;
+
+        let btn = button(text("Item")).on_press(10usize);
+        let detector = gesture_detector(btn).touch_slop(10.0);
+        let mut scope: GestureScope<'_, usize, iced::Theme, iced::Renderer> =
+            gesture_scope(detector);
+
+        let mut tree = Tree::new(&scope as &dyn Widget<usize, iced::Theme, iced::Renderer>);
+        let mut messages = Vec::new();
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(100.0, 100.0));
+        let layout_node = layout::Node::with_children(
+            Size::new(100.0, 100.0),
+            vec![layout::Node::with_children(
+                Size::new(100.0, 100.0),
+                vec![layout::Node::new(Size::new(100.0, 100.0))],
+            )],
+        );
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+        let mut shell = Shell::new(&mut messages);
+
+        // 1. Touch press inside detector
+        scope.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerPressed {
+                id: touch::Finger(1),
+                position: Point::new(50.0, 50.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(50.0, 50.0)),
+            &(),
+            &mut clipboard,
+            &mut shell,
+            &bounds,
+        );
+
+        // Crucial for scrollable coordination: shell event MUST be captured!
+        assert!(shell.is_event_captured(), "Press inside GestureDetector must capture event to lock outer Scrollable");
+    }
+
+    #[test]
+    fn gesture_scope_clean_tap_triggers_child_button() {
+        use iced::widget::button;
+
+        let btn = button(text("Item")).on_press(10usize);
+        let detector = gesture_detector(btn).touch_slop(10.0);
+        let mut scope: GestureScope<'_, usize, iced::Theme, iced::Renderer> =
+            gesture_scope(detector);
+
+        let mut tree = Tree::new(&scope as &dyn Widget<usize, iced::Theme, iced::Renderer>);
+        let mut messages = Vec::new();
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(100.0, 100.0));
+        let layout_node = layout::Node::with_children(
+            Size::new(100.0, 100.0),
+            vec![layout::Node::with_children(
+                Size::new(100.0, 100.0),
+                vec![layout::Node::new(Size::new(100.0, 100.0))],
+            )],
+        );
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+
+        // 1. Touch press
+        scope.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerPressed {
+                id: touch::Finger(1),
+                position: Point::new(50.0, 50.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(50.0, 50.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 2. Touch release without dragging (clean tap)
+        scope.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerLifted {
+                id: touch::Finger(1),
+                position: Point::new(50.0, 50.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(50.0, 50.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        assert_eq!(messages, vec![10usize], "Clean tap inside GestureDetector must emit child button message");
+    }
+
+    #[test]
+    fn gesture_scope_drag_suppresses_button_tap() {
+        use iced::widget::button;
+
+        let btn = button(text("Item")).on_press(10usize);
+        let detector = gesture_detector(btn).touch_slop(10.0);
+        let mut scope: GestureScope<'_, usize, iced::Theme, iced::Renderer> =
+            gesture_scope(detector);
+
+        let mut tree = Tree::new(&scope as &dyn Widget<usize, iced::Theme, iced::Renderer>);
+        let mut messages = Vec::new();
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(100.0, 100.0));
+        let layout_node = layout::Node::with_children(
+            Size::new(100.0, 100.0),
+            vec![layout::Node::with_children(
+                Size::new(100.0, 100.0),
+                vec![layout::Node::new(Size::new(100.0, 100.0))],
+            )],
+        );
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+
+        // 1. Touch press at (50, 50)
+        scope.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerPressed {
+                id: touch::Finger(1),
+                position: Point::new(50.0, 50.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(50.0, 50.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 2. Drag to (50, 20) (30px displacement > 10px slop)
+        scope.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerMoved {
+                id: touch::Finger(1),
+                position: Point::new(50.0, 20.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(50.0, 20.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // 3. Lift at (50, 20)
+        scope.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerLifted {
+                id: touch::Finger(1),
+                position: Point::new(50.0, 20.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(50.0, 20.0)),
+            &(),
+            &mut clipboard,
+            &mut Shell::new(&mut messages),
+            &bounds,
+        );
+
+        // Button tap must be suppressed!
+        assert!(messages.is_empty(), "Drag must suppress child button tap");
+    }
+
+    #[test]
+    fn gesture_detector_touch_outside_does_not_capture() {
+        let mut detector: GestureDetector<'_, usize, iced::Theme, iced::Renderer> =
+            gesture_detector(text("test")).touch_slop(10.0);
+
+        let mut tree = Tree::new(&detector as &dyn Widget<usize, iced::Theme, iced::Renderer>);
+        let mut messages = Vec::new();
+        let bounds = Rectangle::new(Point::ORIGIN, Size::new(100.0, 100.0));
+        let layout_node = layout::Node::with_children(
+            Size::new(100.0, 100.0),
+            vec![layout::Node::new(Size::new(100.0, 100.0))],
+        );
+        let layout = Layout::new(&layout_node);
+        let mut clipboard = iced::advanced::clipboard::Null;
+        let mut shell = Shell::new(&mut messages);
+
+        // Touch at (150, 150) -> outside bounds (0..100, 0..100)
+        detector.update(
+            &mut tree,
+            &Event::Touch(touch::Event::FingerPressed {
+                id: touch::Finger(1),
+                position: Point::new(150.0, 150.0),
+            }),
+            layout,
+            mouse::Cursor::Available(Point::new(150.0, 150.0)),
+            &(),
+            &mut clipboard,
+            &mut shell,
+            &bounds,
+        );
+
+        assert!(!shell.is_event_captured(), "Touch outside GestureDetector must NOT capture event");
     }
 }
 

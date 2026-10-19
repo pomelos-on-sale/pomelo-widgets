@@ -262,93 +262,6 @@ impl<'a, Message> SubPage<'a, Message> {
         self
     }
 
-    // --- Backward compatibility helpers ---
-
-    /// Compatibility helper for cancel with custom label.
-    pub fn cancel_action(mut self, label: impl Into<String>, message: Message) -> Self {
-        self.leading = Some(ActionItem::secondary(label, message).icon(Icon::CLOSE));
-        self
-    }
-
-    /// Compatibility helper for action item.
-    pub fn action(
-        mut self,
-        label: impl Into<String>,
-        message: Message,
-        style: ActionStyle,
-    ) -> Self {
-        self.trailing = Some(ActionItem {
-            label: label.into(),
-            message,
-            style,
-            icon: Some(Icon::CHECK),
-            enabled: true,
-        });
-        self
-    }
-
-    /// Compatibility helper for destructive confirm button.
-    pub fn destructive(mut self, label: impl Into<String>, message: Message) -> Self {
-        self.trailing = Some(ActionItem::destructive(label, message).icon(Icon::CHECK));
-        self
-    }
-
-    /// Compatibility helper for cancel item.
-    pub fn cancel_item(mut self, item: ActionItem<Message>) -> Self {
-        self.leading = Some(item);
-        self
-    }
-
-    /// Compatibility helper for action item.
-    pub fn action_item(mut self, item: ActionItem<Message>) -> Self {
-        self.trailing = Some(item);
-        self
-    }
-
-    /// Compatibility helper for message (no-op or sets body if body not set).
-    pub fn message(self, _message: impl Into<String>) -> Self {
-        self
-    }
-
-    /// Compatibility helper for notice dialog.
-    pub fn notice(
-        title: impl Into<String>,
-        _message: impl Into<String>,
-        _ok_label: impl Into<String>,
-        ok_msg: Message,
-        theme: ThemeMode,
-    ) -> Self {
-        Self::modal(title, theme).confirm(ok_msg)
-    }
-
-    /// Compatibility helper for confirm dialog.
-    pub fn confirm_dialog(
-        prompt: impl Into<String>,
-        _confirm_label: impl Into<String>,
-        confirm_msg: Message,
-        _cancel_label: impl Into<String>,
-        cancel_msg: Message,
-        theme: ThemeMode,
-    ) -> Self {
-        Self::modal(prompt, theme)
-            .cancel(cancel_msg)
-            .confirm(confirm_msg)
-    }
-
-    /// Compatibility helper for destructive confirm dialog.
-    pub fn destructive_confirm(
-        prompt: impl Into<String>,
-        _danger_label: impl Into<String>,
-        danger_msg: Message,
-        _cancel_label: impl Into<String>,
-        cancel_msg: Message,
-        theme: ThemeMode,
-    ) -> Self {
-        Self::modal(prompt, theme)
-            .cancel(cancel_msg)
-            .confirm_destructive(danger_msg)
-    }
-
     /// Renders the sub-page into an iced [`Element`].
     pub fn view(self) -> Element<'a, Message>
     where
@@ -449,7 +362,7 @@ impl<'a, Message> SubPage<'a, Message> {
 
         let page_content = Column::with_children(vec![
             top_container.into(),
-            body_scrollable.into(),
+            crate::gesture::gesture_scope(body_scrollable).into(),
         ])
         .width(Length::Fill)
         .height(Length::Fill);

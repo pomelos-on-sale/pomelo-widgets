@@ -5,11 +5,14 @@ use iced::widget::{button, container, rule, text, Column, Row, Space};
 use iced::{Alignment, Border, Color, Element, Length, Padding, Shadow};
 use pomelo_material_symbols::Icon;
 
-use crate::preferences::{FontSizeTier, ThemeMode};
+use crate::preferences::{FontTier, ThemeMode};
 use crate::toggle::toggle_switch;
 
-/// Default font size for key-value detail rows (standard Small tier: 20px).
-pub const DETAIL_FONT: f32 = FontSizeTier::Small.base_size();
+/// Default font size for items in grouped cards (FontTier::Standard: 24px).
+pub const ITEM_FONT: f32 = FontTier::Standard.base_size();
+
+/// Default font size for key-value detail rows (FontTier::Standard: 24px).
+pub const DETAIL_FONT: f32 = ITEM_FONT;
 
 /// Default vertical and horizontal padding for items.
 pub const ITEM_PADDING: Padding = Padding {

@@ -46,7 +46,7 @@ pub mod usage_card;
 
 pub use button::{Button, ButtonShape, ButtonSize, ButtonVariant};
 pub use page::{
-    page, page_with_modal, page_with_sheet, page_with_sub_page, Page, DEFAULT_PAGE_BODY_ID,
+    page, page_with_modal, page_with_sub_page, Page, DEFAULT_PAGE_BODY_ID,
 };
 pub use usage_card::{usage_bar, UsageCard, BAR_GAP, BAR_HEIGHT, BAR_RADIUS, USAGE_PADDING};
 
@@ -60,7 +60,7 @@ pub use animation::{AnimationController, Curve};
 pub use app::{interval_stream, AppIcon, AppMeta, AppPreferences, BitmapIcon};
 pub use item::{
     card_separator, detail_row, item_separator, Item, ItemBadge, ItemGroup, NavigationAction,
-    OpenPage, CARD_PADDING, DETAIL_FONT, ITEM_PADDING,
+    OpenPage, CARD_PADDING, DETAIL_FONT, ITEM_FONT, ITEM_PADDING,
 };
 pub use section::{
     card_surface, section_surface, Section, CARD_BORDER_WIDTH, CARD_RADIUS, SECTION_BORDER_WIDTH,
@@ -74,14 +74,16 @@ pub use dialog::{
     dialog_confirm_button, dialog_danger_button, modal_dialog, DialogButtonStyle,
 };
 pub use gesture::{
-    drag_disambiguator, gesture_detector, DragDisambiguator, GestureDetector, PanEndDetails,
-    PanStartDetails, PanUpdateDetails, SwipeDirection,
+    drag_disambiguator, gesture_detector, gesture_scope, ArenaEntry, DragDisambiguator,
+    GestureArenaManager, GestureArenaMember, GestureDetector, GestureDisposition, GestureScope,
+    MemberId, PanEndDetails, PanStartDetails, PanUpdateDetails, PointerId, ScopeState,
+    SwipeDirection,
 };
 pub use opaque::opaque;
 pub use pager::{pager, Pager};
 pub use pomelo_material_symbols;
 pub use preferences::{
-    FontSizeTier, FontTier, Language, ScreenOffTimeout, SleepTimeout, SystemPreferences, ThemeMode,
+    FontSizeTier, FontTier, Language, ScreenOffTimeout, SystemPreferences, ThemeMode,
 };
 pub use toast::{
     toast_view, Toast, TOAST_BOTTOM_MARGIN, TOAST_DURATION, TOAST_FONT_SIZE, TOAST_MAX_WIDTH,

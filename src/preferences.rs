@@ -368,100 +368,6 @@ impl ScreenOffTimeout {
     }
 }
 
-/// Inactivity timeout after screen off before the system enters low-power sleep (Sleep).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum SleepTimeout {
-    /// System never enters deep sleep automatically. Default for Pomelo OS.
-    #[default]
-    Never,
-    /// 30 seconds.
-    ThirtySeconds,
-    /// 1 minute.
-    OneMinute,
-    /// 2 minutes.
-    TwoMinutes,
-    /// 5 minutes.
-    FiveMinutes,
-    /// 10 minutes.
-    TenMinutes,
-    /// 30 minutes.
-    ThirtyMinutes,
-}
-
-impl SleepTimeout {
-    /// Available sleep timeout options in UI menus.
-    pub const OPTIONS: [Self; 7] = [
-        Self::Never,
-        Self::ThirtySeconds,
-        Self::OneMinute,
-        Self::TwoMinutes,
-        Self::FiveMinutes,
-        Self::TenMinutes,
-        Self::ThirtyMinutes,
-    ];
-
-    /// Cycles to the next sleep timeout option.
-    #[inline]
-    pub fn cycle(self) -> Self {
-        match self {
-            Self::Never => Self::ThirtySeconds,
-            Self::ThirtySeconds => Self::OneMinute,
-            Self::OneMinute => Self::TwoMinutes,
-            Self::TwoMinutes => Self::FiveMinutes,
-            Self::FiveMinutes => Self::TenMinutes,
-            Self::TenMinutes => Self::ThirtyMinutes,
-            Self::ThirtyMinutes => Self::Never,
-        }
-    }
-
-    /// Duration represented by this option, or `None` if never sleeps.
-    #[inline]
-    pub fn as_duration(self) -> Option<Duration> {
-        match self {
-            Self::Never => None,
-            Self::ThirtySeconds => Some(Duration::from_secs(30)),
-            Self::OneMinute => Some(Duration::from_secs(60)),
-            Self::TwoMinutes => Some(Duration::from_secs(120)),
-            Self::FiveMinutes => Some(Duration::from_secs(300)),
-            Self::TenMinutes => Some(Duration::from_secs(600)),
-            Self::ThirtyMinutes => Some(Duration::from_secs(1800)),
-        }
-    }
-
-    /// Duration in seconds represented by this option, or `None` if never sleeps.
-    #[inline]
-    pub fn as_secs(self) -> Option<u32> {
-        match self {
-            Self::Never => None,
-            Self::ThirtySeconds => Some(30),
-            Self::OneMinute => Some(60),
-            Self::TwoMinutes => Some(120),
-            Self::FiveMinutes => Some(300),
-            Self::TenMinutes => Some(600),
-            Self::ThirtyMinutes => Some(1800),
-        }
-    }
-
-    /// Human-readable name in `language`.
-    pub fn name(self, language: Language) -> &'static str {
-        match (self, language) {
-            (Self::Never, Language::Chinese) => "从不",
-            (Self::Never, Language::English) => "Never",
-            (Self::ThirtySeconds, Language::Chinese) => "30 秒",
-            (Self::ThirtySeconds, Language::English) => "30 seconds",
-            (Self::OneMinute, Language::Chinese) => "1 分钟",
-            (Self::OneMinute, Language::English) => "1 minute",
-            (Self::TwoMinutes, Language::Chinese) => "2 分钟",
-            (Self::TwoMinutes, Language::English) => "2 minutes",
-            (Self::FiveMinutes, Language::Chinese) => "5 分钟",
-            (Self::FiveMinutes, Language::English) => "5 minutes",
-            (Self::TenMinutes, Language::Chinese) => "10 分钟",
-            (Self::TenMinutes, Language::English) => "10 minutes",
-            (Self::ThirtyMinutes, Language::Chinese) => "30 分钟",
-            (Self::ThirtyMinutes, Language::English) => "30 minutes",
-        }
-    }
-}
 
 /// Default internal AppData directory on hardware.
 pub const BOARD_APP_DATA: &str = "/internal/AppData";
@@ -525,9 +431,6 @@ pub struct SystemPreferences {
     /// Inactivity timeout before screen turns off (Screen Off). Defaults to never turning off.
     #[serde(default)]
     pub screen_off_timeout: ScreenOffTimeout,
-    /// Inactivity timeout after screen off before system enters low-power sleep (Sleep). Defaults to never sleeping.
-    #[serde(default)]
-    pub sleep_timeout: SleepTimeout,
     /// Whether to stay awake while connected to USB. Defaults to true.
     #[serde(default = "default_true")]
     pub stay_awake_on_usb: bool,
@@ -540,7 +443,6 @@ impl Default for SystemPreferences {
             theme: ThemeMode::Dark,
             font_tier: FontSizeTier::Standard,
             screen_off_timeout: ScreenOffTimeout::Never,
-            sleep_timeout: SleepTimeout::Never,
             stay_awake_on_usb: true,
         }
     }
@@ -554,7 +456,6 @@ impl SystemPreferences {
             theme,
             font_tier,
             screen_off_timeout: ScreenOffTimeout::Never,
-            sleep_timeout: SleepTimeout::Never,
             stay_awake_on_usb: true,
         }
     }
@@ -562,12 +463,6 @@ impl SystemPreferences {
     /// Sets the screen-off timeout.
     pub const fn with_screen_off_timeout(mut self, screen_off_timeout: ScreenOffTimeout) -> Self {
         self.screen_off_timeout = screen_off_timeout;
-        self
-    }
-
-    /// Sets the sleep timeout.
-    pub const fn with_sleep_timeout(mut self, sleep_timeout: SleepTimeout) -> Self {
-        self.sleep_timeout = sleep_timeout;
         self
     }
 
@@ -705,46 +600,12 @@ mod tests {
     }
 
     #[test]
-    fn sleep_timeout_cycle_and_duration() {
-        assert_eq!(SleepTimeout::default(), SleepTimeout::Never);
-        assert_eq!(SleepTimeout::Never.as_duration(), None);
-        assert_eq!(SleepTimeout::Never.as_secs(), None);
-
-        assert_eq!(SleepTimeout::Never.cycle(), SleepTimeout::ThirtySeconds);
-        assert_eq!(SleepTimeout::ThirtySeconds.as_duration(), Some(Duration::from_secs(30)));
-        assert_eq!(SleepTimeout::ThirtySeconds.as_secs(), Some(30));
-
-        assert_eq!(SleepTimeout::ThirtySeconds.cycle(), SleepTimeout::OneMinute);
-        assert_eq!(SleepTimeout::OneMinute.as_duration(), Some(Duration::from_secs(60)));
-        assert_eq!(SleepTimeout::OneMinute.as_secs(), Some(60));
-
-        assert_eq!(SleepTimeout::OneMinute.cycle(), SleepTimeout::TwoMinutes);
-        assert_eq!(SleepTimeout::TwoMinutes.as_duration(), Some(Duration::from_secs(120)));
-        assert_eq!(SleepTimeout::TwoMinutes.as_secs(), Some(120));
-
-        assert_eq!(SleepTimeout::TwoMinutes.cycle(), SleepTimeout::FiveMinutes);
-        assert_eq!(SleepTimeout::FiveMinutes.as_duration(), Some(Duration::from_secs(300)));
-        assert_eq!(SleepTimeout::FiveMinutes.as_secs(), Some(300));
-
-        assert_eq!(SleepTimeout::FiveMinutes.cycle(), SleepTimeout::TenMinutes);
-        assert_eq!(SleepTimeout::TenMinutes.as_duration(), Some(Duration::from_secs(600)));
-        assert_eq!(SleepTimeout::TenMinutes.as_secs(), Some(600));
-
-        assert_eq!(SleepTimeout::TenMinutes.cycle(), SleepTimeout::ThirtyMinutes);
-        assert_eq!(SleepTimeout::ThirtyMinutes.as_duration(), Some(Duration::from_secs(1800)));
-        assert_eq!(SleepTimeout::ThirtyMinutes.as_secs(), Some(1800));
-
-        assert_eq!(SleepTimeout::ThirtyMinutes.cycle(), SleepTimeout::Never);
-    }
-
-    #[test]
     fn preferences_roundtrip_persistence() {
         let temp_dir = std::env::temp_dir().join(format!("pomelo_test_prefs_{}", std::process::id()));
         let _ = fs::remove_dir_all(&temp_dir);
 
         let initial = SystemPreferences::default();
         assert_eq!(initial.screen_off_timeout, ScreenOffTimeout::Never);
-        assert_eq!(initial.sleep_timeout, SleepTimeout::Never);
         assert!(initial.stay_awake_on_usb);
 
         let modified = SystemPreferences {
@@ -752,7 +613,6 @@ mod tests {
             theme: ThemeMode::Light,
             font_tier: FontSizeTier::Large,
             screen_off_timeout: ScreenOffTimeout::ThirtySeconds,
-            sleep_timeout: SleepTimeout::FiveMinutes,
             stay_awake_on_usb: false,
         };
 
@@ -764,7 +624,6 @@ mod tests {
 
         assert_eq!(loaded, modified);
         assert_eq!(loaded.screen_off_timeout, ScreenOffTimeout::ThirtySeconds);
-        assert_eq!(loaded.sleep_timeout, SleepTimeout::FiveMinutes);
         assert!(!loaded.stay_awake_on_usb);
 
         let _ = fs::remove_dir_all(&temp_dir);
