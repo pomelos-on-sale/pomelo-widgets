@@ -6,13 +6,12 @@
 //! - [`FontSizeTier`]: typography scale with three tiers (20px, 24px, 30px)
 //! - [`SystemPreferences`]: aggregated system preference state
 
-use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use iced::Color;
 use serde::{Deserialize, Serialize};
+use pomelo_hal::PersistentConfig;
 
 /// The interface language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -371,44 +370,11 @@ impl ScreenOffTimeout {
 
 /// Subdirectory / namespace where system settings are stored.
 pub const PREFERENCES_DIR: &str = "SETTINGS";
-/// Filename for system preferences.
-pub const PREFERENCES_FILE: &str = "preferences.json";
 
 /// Returns whether the current process is running as a test harness binary.
+#[inline]
 pub fn is_test_runner() -> bool {
-    #[cfg(test)]
-    {
-        true
-    }
-    #[cfg(not(test))]
-    {
-        if let Ok(exe) = std::env::current_exe() {
-            let s = exe.to_string_lossy();
-            if s.contains("/target/") && s.contains("/deps/") {
-                return true;
-            }
-        }
-        false
-    }
-}
-
-/// Resolves the storage root for system preferences.
-pub fn resolve_app_data_root() -> PathBuf {
-    if let Ok(custom) = std::env::var("POMELO_APP_DATA") {
-        let trimmed = custom.trim();
-        if !trimmed.is_empty() {
-            return PathBuf::from(trimmed);
-        }
-    }
-    if is_test_runner() {
-        std::env::temp_dir()
-            .join("pomelo_prefs_tests")
-            .join(format!("pid_{}", std::process::id()))
-    } else if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home).join(".pomelo/AppData")
-    } else {
-        std::env::temp_dir().join("pomelo/AppData")
-    }
+    pomelo_hal::storage::is_test_runner()
 }
 
 const fn default_true() -> bool {
@@ -480,111 +446,13 @@ impl SystemPreferences {
         FontSizeTier::SIZES
     }
 
-    /// Path to preferences file under `root`.
-    pub fn file_path(root: impl AsRef<Path>) -> PathBuf {
-        root.as_ref().join(PREFERENCES_DIR).join(PREFERENCES_FILE)
-    }
-
-    /// Loads preferences from a specified root directory.
-    pub fn load_from(root: impl AsRef<Path>) -> io::Result<Option<Self>> {
-        let p = Self::file_path(root);
-        let text = match fs::read_to_string(&p) {
-            Ok(t) => t,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(e),
-        };
-        serde_json::from_str(&text)
-            .map(Some)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
-    }
-
-    /// Saves preferences atomically to a specified root directory, skipping write if unchanged.
-    pub fn save_to(&self, root: impl AsRef<Path>) -> io::Result<()> {
-        let p = Self::file_path(root);
-        let text = serde_json::to_string_pretty(self)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        // 避免重复写入无变化的 Flash 内容
-        if p.exists() {
-            if let Ok(existing) = fs::read_to_string(&p) {
-                if existing == text {
-                    return Ok(());
-                }
-            }
-        }
-
-        if let Some(parent) = p.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        let temp_name = format!(".preferences.json.tmp.{}", std::process::id());
-        let temp_path = p.with_file_name(temp_name);
-        fs::write(&temp_path, &text)?;
-        if let Err(e) = fs::rename(&temp_path, &p) {
-            let _ = fs::remove_file(&temp_path);
-            return Err(e);
-        }
-        Ok(())
-    }
-
     /// Loads preferences from active persistent storage (NVS KV on hardware, or mock KV on desktop).
     /// Falls back to default preferences if not found or corrupted.
     pub fn load() -> Self {
         if is_test_runner() && std::env::var("POMELO_APP_DATA").is_err() {
             return Self::default();
         }
-
-        #[cfg(target_os = "espidf")]
-        {
-            use std::ffi::CString;
-            let c_part = CString::new("nvs_app").unwrap();
-            let c_ns = CString::new(PREFERENCES_DIR).unwrap();
-            let c_key = CString::new("preferences").unwrap();
-            let mut len: usize = 0;
-            let ret = unsafe {
-                nvs_ffi::hal_nvs_get_blob(
-                    c_part.as_ptr(),
-                    c_ns.as_ptr(),
-                    c_key.as_ptr(),
-                    std::ptr::null_mut(),
-                    &mut len,
-                )
-            };
-            if ret == 0 && len > 0 {
-                let mut buf = vec![0u8; len];
-                let ret = unsafe {
-                    nvs_ffi::hal_nvs_get_blob(
-                        c_part.as_ptr(),
-                        c_ns.as_ptr(),
-                        c_key.as_ptr(),
-                        buf.as_mut_ptr(),
-                        &mut len,
-                    )
-                };
-                if ret == 0 {
-                    if let Ok(prefs) = serde_json::from_slice::<Self>(&buf[..len]) {
-                        return prefs;
-                    }
-                }
-            }
-        }
-
-        let kv_path = resolve_app_data_root()
-            .join("kv")
-            .join(PREFERENCES_DIR)
-            .join("preferences.bin");
-        if kv_path.exists() {
-            if let Ok(bytes) = fs::read(&kv_path) {
-                if let Ok(prefs) = serde_json::from_slice::<Self>(&bytes) {
-                    return prefs;
-                }
-            }
-        }
-
-        Self::load_from(resolve_app_data_root())
-            .ok()
-            .flatten()
-            .unwrap_or_default()
+        <Self as PersistentConfig>::load()
     }
 
     /// Saves preferences to active persistent storage (NVS KV on hardware, or mock KV on desktop).
@@ -592,69 +460,19 @@ impl SystemPreferences {
         if is_test_runner() && std::env::var("POMELO_APP_DATA").is_err() {
             return Ok(());
         }
-
-        let bytes = serde_json::to_vec(self)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        #[cfg(target_os = "espidf")]
-        {
-            use std::ffi::CString;
-            let c_part = CString::new("nvs_app").unwrap();
-            let c_ns = CString::new(PREFERENCES_DIR).unwrap();
-            let c_key = CString::new("preferences").unwrap();
-            let ret = unsafe {
-                nvs_ffi::hal_nvs_set_blob(
-                    c_part.as_ptr(),
-                    c_ns.as_ptr(),
-                    c_key.as_ptr(),
-                    bytes.as_ptr(),
-                    bytes.len(),
-                )
-            };
-            if ret != 0 {
-                return Err(io::Error::new(io::ErrorKind::Other, format!("nvs_set_blob error: {ret:#x}")));
-            }
-            return Ok(());
-        }
-
-        #[cfg(not(target_os = "espidf"))]
-        {
-            let kv_path = resolve_app_data_root()
-                .join("kv")
-                .join(PREFERENCES_DIR)
-                .join("preferences.bin");
-            if let Some(parent) = kv_path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            let _ = fs::write(&kv_path, &bytes);
-            self.save_to(resolve_app_data_root())
-        }
+        <Self as PersistentConfig>::save(self)
     }
 }
 
-#[cfg(target_os = "espidf")]
-mod nvs_ffi {
-    extern "C" {
-        pub fn hal_nvs_get_blob(
-            part: *const std::os::raw::c_char,
-            ns: *const std::os::raw::c_char,
-            key: *const std::os::raw::c_char,
-            out_buf: *mut u8,
-            inout_len: *mut usize,
-        ) -> i32;
-        pub fn hal_nvs_set_blob(
-            part: *const std::os::raw::c_char,
-            ns: *const std::os::raw::c_char,
-            key: *const std::os::raw::c_char,
-            data: *const u8,
-            len: usize,
-        ) -> i32;
-    }
+impl PersistentConfig for SystemPreferences {
+    const APP_ID: &'static str = PREFERENCES_DIR;
+    const KEY: &'static str = "preferences";
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn language_toggles() {
@@ -709,8 +527,9 @@ mod tests {
     fn preferences_roundtrip_persistence() {
         let temp_dir = std::env::temp_dir().join(format!("pomelo_test_prefs_{}", std::process::id()));
         let _ = fs::remove_dir_all(&temp_dir);
+        std::env::set_var("POMELO_APP_DATA", &temp_dir);
 
-        let initial = SystemPreferences::default();
+        let initial = SystemPreferences::load();
         assert_eq!(initial.screen_off_timeout, ScreenOffTimeout::Never);
         assert!(initial.stay_awake_on_usb);
 
@@ -722,16 +541,15 @@ mod tests {
             stay_awake_on_usb: false,
         };
 
-        modified.save_to(&temp_dir).expect("save should succeed");
+        modified.save().expect("save should succeed");
 
-        let loaded = SystemPreferences::load_from(&temp_dir)
-            .expect("load should succeed")
-            .expect("file should exist");
+        let loaded = SystemPreferences::load();
 
         assert_eq!(loaded, modified);
         assert_eq!(loaded.screen_off_timeout, ScreenOffTimeout::ThirtySeconds);
         assert!(!loaded.stay_awake_on_usb);
 
+        std::env::remove_var("POMELO_APP_DATA");
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }
