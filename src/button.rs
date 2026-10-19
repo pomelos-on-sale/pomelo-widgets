@@ -91,19 +91,14 @@ impl ButtonSize {
 }
 
 /// Corner geometry of a [`Button`].
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum ButtonShape {
     /// Full capsule / pill (corner radius = height / 2.0).
     /// For icon-only square buttons, this produces a perfect circle.
+    #[default]
     Pill,
     /// Rounded rectangle with specified corner radius in pixels.
     Rounded(f32),
-}
-
-impl Default for ButtonShape {
-    fn default() -> Self {
-        Self::Pill
-    }
 }
 
 /// Strongly-typed, rounded button widget conforming to Pomelo OS design language.
@@ -443,8 +438,8 @@ impl<'a, Message> Button<'a, Message> {
                     ThemeMode::Dark => Color::from_rgba(1.0, 1.0, 1.0, 0.10),
                     ThemeMode::Light => Color::from_rgba(0.0, 0.0, 0.0, 0.08),
                 };
-                let fg = self.color.unwrap_or_else(|| theme.text_primary());
-                let b_col = self.border_color.unwrap_or_else(|| accent_color);
+                let fg = self.color.unwrap_or(theme.text_primary());
+                let b_col = self.border_color.unwrap_or(accent_color);
                 (nbg, pbg, fg, b_col)
             }
             ButtonVariant::Ghost => {

@@ -587,20 +587,18 @@ where
                     }
                 }
             }
-            Event::Touch(touch::Event::FingerLost { .. }) => {
-                if state.pointer_down {
-                    state.pointer_down = false;
-                    state.has_dragged = false;
-                    if state.is_dragging {
-                        state.is_dragging = false;
-                        if let Some(on_pan_cancel) = &self.on_pan_cancel {
-                            shell.publish(on_pan_cancel.clone());
-                        } else if let Some(on_pan_end) = &self.on_pan_end {
-                            shell.publish(on_pan_end(PanEndDetails {
-                                velocity: Vector::ZERO,
-                                total_delta: Vector::ZERO,
-                            }));
-                        }
+            Event::Touch(touch::Event::FingerLost { .. }) if state.pointer_down => {
+                state.pointer_down = false;
+                state.has_dragged = false;
+                if state.is_dragging {
+                    state.is_dragging = false;
+                    if let Some(on_pan_cancel) = &self.on_pan_cancel {
+                        shell.publish(on_pan_cancel.clone());
+                    } else if let Some(on_pan_end) = &self.on_pan_end {
+                        shell.publish(on_pan_end(PanEndDetails {
+                            velocity: Vector::ZERO,
+                            total_delta: Vector::ZERO,
+                        }));
                     }
                 }
             }

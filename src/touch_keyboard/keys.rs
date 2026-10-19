@@ -96,7 +96,7 @@ impl From<&'static str> for KeyLabel {
 
 impl From<&&'static str> for KeyLabel {
     fn from(s: &&'static str) -> Self {
-        KeyLabel::Text(*s)
+        KeyLabel::Text(s)
     }
 }
 

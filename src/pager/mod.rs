@@ -463,9 +463,8 @@ where
                         let dragged_x = position.x - state.start_x;
 
                         // Apply damping when pulling past the ends
-                        let effective_delta = if dragged_x > 0.0 && !can_prev {
-                            dragged_x * 0.25
-                        } else if dragged_x < 0.0 && !can_next {
+                        let is_overscrolling = (dragged_x > 0.0 && !can_prev) || (dragged_x < 0.0 && !can_next);
+                        let effective_delta = if is_overscrolling {
                             dragged_x * 0.25
                         } else {
                             dragged_x
@@ -515,9 +514,8 @@ where
                         // Continuous linear drag displacement relative to slop-adjusted start_x
                         let dragged_x = position.x - state.start_x;
 
-                        let effective_delta = if dragged_x > 0.0 && !can_prev {
-                            dragged_x * 0.25
-                        } else if dragged_x < 0.0 && !can_next {
+                        let is_overscrolling = (dragged_x > 0.0 && !can_prev) || (dragged_x < 0.0 && !can_next);
+                        let effective_delta = if is_overscrolling {
                             dragged_x * 0.25
                         } else {
                             dragged_x
@@ -584,9 +582,8 @@ where
                         let can_prev = current_page > 0;
                         let can_next = current_page + 1 < page_count;
                         let dragged_x = position.x - state.start_x;
-                        let effective_delta = if dragged_x > 0.0 && !can_prev {
-                            dragged_x * 0.25
-                        } else if dragged_x < 0.0 && !can_next {
+                        let is_overscrolling = (dragged_x > 0.0 && !can_prev) || (dragged_x < 0.0 && !can_next);
+                        let effective_delta = if is_overscrolling {
                             dragged_x * 0.25
                         } else {
                             dragged_x
@@ -609,38 +606,38 @@ where
                     }
                 }
             }
-            Event::Window(window::Event::RedrawRequested(now)) => {
-                if state.animator.is_animating() {
-                    let is_still_running = state.animator.update(*now);
-                    state.drag_offset = state.animator.value();
+            Event::Window(window::Event::RedrawRequested(now))
+                if state.animator.is_animating() =>
+            {
+                let is_still_running = state.animator.update(*now);
+                state.drag_offset = state.animator.value();
 
-                    if is_still_running {
-                        shell.request_redraw();
-                    } else {
-                        // Animation completed and reached target_offset (e.g. -width, width, or 0.0)
-                        state.drag_offset = state.animator.value();
-                        if let Some(target_page) = state.settle_target_page {
-                            if target_page != current_page {
-                                // Keep state.drag_offset at target_offset so this frame's draw()
-                                // continues rendering target_page without jumping back to old page!
-                                if let Some(on_change) = &self.on_change {
-                                    shell.publish(on_change(target_page));
-                                } else {
-                                    state.settle_target_page = None;
-                                    state.drag_offset = 0.0;
-                                    state.has_dragged = false;
-                                }
+                if is_still_running {
+                    shell.request_redraw();
+                } else {
+                    // Animation completed and reached target_offset (e.g. -width, width, or 0.0)
+                    state.drag_offset = state.animator.value();
+                    if let Some(target_page) = state.settle_target_page {
+                        if target_page != current_page {
+                            // Keep state.drag_offset at target_offset so this frame's draw()
+                            // continues rendering target_page without jumping back to old page!
+                            if let Some(on_change) = &self.on_change {
+                                shell.publish(on_change(target_page));
                             } else {
                                 state.settle_target_page = None;
                                 state.drag_offset = 0.0;
                                 state.has_dragged = false;
                             }
                         } else {
+                            state.settle_target_page = None;
                             state.drag_offset = 0.0;
                             state.has_dragged = false;
                         }
-                        shell.request_redraw();
+                    } else {
+                        state.drag_offset = 0.0;
+                        state.has_dragged = false;
                     }
+                    shell.request_redraw();
                 }
             }
             _ => {}

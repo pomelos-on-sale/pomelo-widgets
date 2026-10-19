@@ -451,15 +451,14 @@ impl<Message: Clone> Item<Message> {
                 value,
             } => {
                 if let Some(b) = badge {
-                    let mut left_items: Vec<Element<'a, Message>> = Vec::new();
-                    left_items.push(render_badge(b));
-                    left_items.push(Space::new().width(Length::Fixed(12.0)).into());
-                    left_items.push(
+                    let left_items = vec![
+                        render_badge(b),
+                        Space::new().width(Length::Fixed(12.0)).into(),
                         text(label)
                             .size(DETAIL_FONT)
                             .color(theme.text_primary())
                             .into(),
-                    );
+                    ];
                     let row = Row::new()
                         .width(Length::Fill)
                         .align_y(Alignment::Center)

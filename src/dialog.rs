@@ -37,10 +37,10 @@ pub const BUTTON_RADIUS: f32 = 12.0;
 pub const BACKDROP_COLOR: Color = Color::from_rgba(0.0, 0.0, 0.0, 0.6);
 
 /// The standard primary accent color for confirm buttons.
-pub const ACCENT: Color = Color::from_rgb(10.0 / 255.0, 132.0 / 255.0, 255.0 / 255.0);
+pub const ACCENT: Color = Color::from_rgb(10.0 / 255.0, 132.0 / 255.0, 1.0);
 
 /// The standard danger color for high-risk confirm buttons (e.g. format, restore).
-pub const DANGER: Color = Color::from_rgb(255.0 / 255.0, 59.0 / 255.0, 48.0 / 255.0);
+pub const DANGER: Color = Color::from_rgb(1.0, 59.0 / 255.0, 48.0 / 255.0);
 
 /// Wraps `content` in a dimmed, full-screen opaque backdrop centered on the screen.
 ///
@@ -60,7 +60,6 @@ pub fn modal_dialog<'a, Message: 'a>(
                 ..container::Style::default()
             }),
     )
-    .into()
 }
 
 /// Standard 360 px dialog card container with card background, border, and padding.
@@ -105,6 +104,7 @@ pub fn dialog_box<'a, Message: 'a>(
 ///
 /// Features a title, a body/description message, and two action buttons:
 /// a Cancel button and a Confirm button (either Primary or Danger).
+#[allow(clippy::too_many_arguments)]
 pub fn confirm_dialog<'a, Message: 'a + Clone>(
     title: impl Into<String>,
     description: impl Into<String>,

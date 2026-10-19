@@ -60,7 +60,7 @@ impl<'a, Message: 'a> Page<'a, Message> {
 
     /// Consumes the page builder and returns the root [`Element`].
     pub fn view(self) -> Element<'a, Message> {
-        self.stack.width(Length::Fill).height(Length::Fill).into()
+        self.stack.into()
     }
 }
 

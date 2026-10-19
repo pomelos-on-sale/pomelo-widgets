@@ -32,12 +32,6 @@ pub const TOP_BAR_TITLE_FONT: f32 = FontTier::Standard.base_size();
 /// Top bar icon size in a [`SubPage`] (standard 24px).
 pub const TOP_BAR_ICON: f32 = FontTier::Standard.base_size();
 
-// Backward compatibility constants
-pub const ACTION_SHEET_HEIGHT_RATIO: f32 = SUB_PAGE_HEIGHT_RATIO;
-pub const ACTION_SHEET_HEIGHT: f32 = SUB_PAGE_HEIGHT;
-pub const BODY_TITLE_FONT: f32 = TOP_BAR_TITLE_FONT;
-pub const BODY_TITLE_ICON: f32 = TOP_BAR_ICON;
-pub const BODY_MESSAGE_FONT: f32 = TOP_BAR_TITLE_FONT;
 
 /// Visual style of an action button within a [`SubPage`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -398,7 +392,6 @@ impl<'a, Message> SubPage<'a, Message> {
                     ..container::Style::default()
                 }),
         )
-        .into()
     }
 }
 

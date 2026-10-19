@@ -51,10 +51,9 @@ pub use page::{
 pub use usage_card::{usage_bar, UsageCard, BAR_GAP, BAR_HEIGHT, BAR_RADIUS, USAGE_PADDING};
 
 pub use sub_page::{
-    capsule_icon_button, ActionItem, ActionSheet, ActionStyle, SubPage, ACTION_SHEET_HEIGHT,
-    ACTION_SHEET_HEIGHT_RATIO, BODY_MESSAGE_FONT, BODY_TITLE_FONT, BODY_TITLE_ICON,
-    CAPSULE_BUTTON_GLYPH, CAPSULE_BUTTON_HEIGHT, CAPSULE_BUTTON_WIDTH, SUB_PAGE_HEIGHT,
-    SUB_PAGE_HEIGHT_RATIO, TOP_BAR_ICON, TOP_BAR_TITLE_FONT,
+    capsule_icon_button, ActionItem, ActionSheet, ActionStyle, SubPage, CAPSULE_BUTTON_GLYPH,
+    CAPSULE_BUTTON_HEIGHT, CAPSULE_BUTTON_WIDTH, SUB_PAGE_HEIGHT, SUB_PAGE_HEIGHT_RATIO,
+    TOP_BAR_ICON, TOP_BAR_TITLE_FONT,
 };
 pub use animation::{AnimationController, Curve};
 pub use app::{interval_stream, AppIcon, AppMeta, AppPreferences, BitmapIcon};

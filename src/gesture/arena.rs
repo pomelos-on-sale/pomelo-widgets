@@ -118,7 +118,7 @@ impl GestureArenaManager {
 
     /// Returns whether the pointer is claimed.
     pub fn is_claimed(&self, pointer: PointerId) -> bool {
-        self.arenas.get(&pointer).map_or(false, |e| e.is_claimed)
+        self.arenas.get(&pointer).is_some_and(|e| e.is_claimed)
     }
 
     /// Resolves the disposition of `member` in the arena for `pointer`.
