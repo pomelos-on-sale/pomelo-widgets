@@ -2,7 +2,7 @@
 //!
 //! Provides customizable, high-precision tactile buttons supporting:
 //! - Visual variants: `Secondary` (translucent frame), `Primary` (filled accent),
-//!   `Tinted` (accent-tinted frame & surface), `Outline` (clean border), `Ghost`, and `Destructive`
+//!   `Tinted` (accent-tinted frame & surface), `Outline` (clean border), and `Destructive`
 //! - Shapes: `Pill` (full circular ends / circular icon button) and `Rounded` (configurable radius)
 //! - Sizes: `Compact` (32px), `Standard` (38px), `Large` (46px), and `Capsule` (48px)
 //! - Content: text label, icon, or icon + text combination
@@ -13,7 +13,45 @@ use iced::widget::{button, container, text, Row};
 use iced::{Alignment, Border, Color, Element, Length, Padding, Shadow};
 use pomelo_material_symbols::Icon;
 
-use crate::preferences::ThemeMode;
+use crate::preferences::{FontSizeTier, ThemeMode};
+
+/// Default width of a standard capsule navigation button in pixels (72px).
+pub const CAPSULE_WIDTH: f32 = 72.0;
+/// Default height of a standard capsule navigation button in pixels (48px).
+pub const CAPSULE_HEIGHT: f32 = 48.0;
+
+/// Content for a button: either text label or an icon glyph.
+#[derive(Debug, Clone)]
+pub enum ButtonContent {
+    /// Text label.
+    Text(Cow<'static, str>),
+    /// Icon glyph.
+    Icon(Icon),
+}
+
+impl From<&'static str> for ButtonContent {
+    fn from(s: &'static str) -> Self {
+        Self::Text(s.into())
+    }
+}
+
+impl From<String> for ButtonContent {
+    fn from(s: String) -> Self {
+        Self::Text(s.into())
+    }
+}
+
+impl From<Cow<'static, str>> for ButtonContent {
+    fn from(c: Cow<'static, str>) -> Self {
+        Self::Text(c)
+    }
+}
+
+impl From<Icon> for ButtonContent {
+    fn from(icon: Icon) -> Self {
+        Self::Icon(icon)
+    }
+}
 
 /// Visual styling variant for a [`Button`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -28,8 +66,6 @@ pub enum ButtonVariant {
     Tinted,
     /// Transparent background with a distinct 1px border.
     Outline,
-    /// Borderless and backgroundless plain button.
-    Ghost,
     /// Destructive high-risk action button (system red).
     Destructive,
 }
@@ -65,7 +101,7 @@ impl ButtonSize {
             Self::Compact => 14.0,
             Self::Standard => 16.0,
             Self::Large => 18.0,
-            Self::Capsule => 22.0,
+            Self::Capsule => FontSizeTier::Small.base_size(), // 20.0 px
         }
     }
 
@@ -183,6 +219,17 @@ impl<'a, Message> Button<'a, Message> {
         }
     }
 
+    /// Creates a standard navigation capsule button (72×48px pill, default secondary variant).
+    pub fn capsule(content: impl Into<ButtonContent>) -> Self {
+        let mut btn = match content.into() {
+            ButtonContent::Text(text) => Self::new(text),
+            ButtonContent::Icon(icon) => Self::icon(icon),
+        };
+        btn.size = ButtonSize::Capsule;
+        btn.shape = ButtonShape::Pill;
+        btn
+    }
+
     /// Creates a button with both an icon and text label.
     pub fn icon_text(icon: Icon, text: impl Into<Cow<'static, str>>) -> Self {
         Self {
@@ -264,12 +311,6 @@ impl<'a, Message> Button<'a, Message> {
     /// Sets outline border style.
     pub fn outline(mut self) -> Self {
         self.variant = ButtonVariant::Outline;
-        self
-    }
-
-    /// Sets ghost borderless style.
-    pub fn ghost(mut self) -> Self {
-        self.variant = ButtonVariant::Ghost;
         self
     }
 
@@ -442,15 +483,6 @@ impl<'a, Message> Button<'a, Message> {
                 let b_col = self.border_color.unwrap_or(accent_color);
                 (nbg, pbg, fg, b_col)
             }
-            ButtonVariant::Ghost => {
-                let nbg = Color::TRANSPARENT;
-                let pbg = match theme {
-                    ThemeMode::Dark => Color::from_rgba(1.0, 1.0, 1.0, 0.10),
-                    ThemeMode::Light => Color::from_rgba(0.0, 0.0, 0.0, 0.08),
-                };
-                let fg = self.color.unwrap_or_else(|| theme.text_primary());
-                (nbg, pbg, fg, Color::TRANSPARENT)
-            }
         };
 
         // Determine content layout
@@ -503,27 +535,24 @@ impl<'a, Message> Button<'a, Message> {
             .padding(padding)
             .center_y(Length::Fixed(h));
 
-        if let Some(w) = self.width {
-            inner_container = inner_container.center_x(w);
+        let default_width = if self.size == ButtonSize::Capsule {
+            Some(Length::Fixed(CAPSULE_WIDTH))
         } else if is_icon_only {
-            let icon_btn_w = if self.size == ButtonSize::Capsule {
-                crate::sub_page::CAPSULE_BUTTON_WIDTH
-            } else {
-                h
-            };
-            inner_container = inner_container.center_x(Length::Fixed(icon_btn_w));
+            Some(Length::Fixed(h))
+        } else {
+            None
+        };
+
+        if let Some(w) = self.width.or(default_width) {
+            inner_container = inner_container.center_x(w);
         }
 
-        let border_width = if self.variant == ButtonVariant::Ghost {
-            0.0
-        } else {
-            self.border_width
-        };
+        let border_width = self.border_width;
 
         let mut btn = button(inner_container)
             .padding(0)
             .style(move |_t, status| {
-                let bg = if matches!(status, button::Status::Pressed | button::Status::Hovered) {
+                let bg = if matches!(status, button::Status::Pressed) {
                     pressed_bg
                 } else {
                     normal_bg
@@ -541,15 +570,8 @@ impl<'a, Message> Button<'a, Message> {
                 }
             });
 
-        if let Some(w) = self.width {
+        if let Some(w) = self.width.or(default_width) {
             btn = btn.width(w);
-        } else if is_icon_only {
-            let icon_btn_w = if self.size == ButtonSize::Capsule {
-                crate::sub_page::CAPSULE_BUTTON_WIDTH
-            } else {
-                h
-            };
-            btn = btn.width(Length::Fixed(icon_btn_w));
         }
 
         if let Some(h_len) = self.height {
@@ -603,6 +625,5 @@ mod tests {
         let _t: Element<'_, usize> = Button::new("Tinted").tinted().compact().view();
         let _d: Element<'_, usize> = Button::new("Delete").destructive().rounded(8.0).view();
         let _o: Element<'_, usize> = Button::new("Outline").outline().view();
-        let _g: Element<'_, usize> = Button::new("Ghost").ghost().view();
     }
 }

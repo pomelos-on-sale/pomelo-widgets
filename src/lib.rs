@@ -43,19 +43,21 @@ pub mod toggle;
 pub mod touch_keyboard;
 pub mod usage_card;
 
-pub use button::{Button, ButtonShape, ButtonSize, ButtonVariant};
+pub use button::{
+    Button, ButtonContent, ButtonShape, ButtonSize, ButtonVariant, CAPSULE_HEIGHT, CAPSULE_WIDTH,
+};
 pub use page::{
     page, page_with_modal, page_with_sub_page, Page, DEFAULT_PAGE_BODY_ID,
 };
 pub use usage_card::{usage_bar, UsageCard, BAR_GAP, BAR_HEIGHT, BAR_RADIUS, USAGE_PADDING};
 
 pub use sub_page::{
-    capsule_icon_button, ActionItem, ActionStyle, SubPage, CAPSULE_BUTTON_GLYPH,
+    ActionItem, ActionStyle, SubPage, CAPSULE_BUTTON_GLYPH,
     CAPSULE_BUTTON_HEIGHT, CAPSULE_BUTTON_WIDTH, SUB_PAGE_HEIGHT, SUB_PAGE_HEIGHT_RATIO,
     TOP_BAR_ICON, TOP_BAR_TITLE_FONT,
 };
 pub use animation::{AnimationController, Curve};
-pub use app::{interval_stream, AppIcon, AppMeta, AppPreferences, BitmapIcon};
+pub use app::{interval_stream, AppIcon, AppMeta, AppPreferences, BitmapIcon, KeepAwake};
 pub use item::{
     detail_row, item_separator, Item, ItemBadge, ItemGroup, NavigationAction,
     OpenPage, DETAIL_FONT, ITEM_FONT, ITEM_PADDING,
@@ -71,7 +73,7 @@ pub use dialog::{
     dialog_confirm_button, dialog_danger_button, modal_dialog, DialogButtonStyle,
 };
 pub use gesture::{
-    drag_disambiguator, gesture_detector, gesture_scope, ArenaEntry, DragDisambiguator,
+    gesture_detector, gesture_scope, ArenaEntry,
     GestureArenaManager, GestureArenaMember, GestureDetector, GestureDisposition, GestureScope,
     MemberId, PanEndDetails, PanStartDetails, PanUpdateDetails, PointerId, ScopeState,
     SwipeDirection,

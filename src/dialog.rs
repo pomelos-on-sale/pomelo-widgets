@@ -185,7 +185,7 @@ pub fn dialog_button<'a, Message: 'a + Clone>(
     .style(move |_theme, status| {
         let (bg, fg) = match button_style {
             DialogButtonStyle::Cancel => {
-                let fill = if matches!(status, button::Status::Pressed | button::Status::Hovered) {
+                let fill = if matches!(status, button::Status::Pressed) {
                     match theme {
                         ThemeMode::Dark => Color::from_rgb8(74, 74, 80),
                         ThemeMode::Light => Color::from_rgb8(209, 209, 214),
@@ -200,7 +200,7 @@ pub fn dialog_button<'a, Message: 'a + Clone>(
             }
             DialogButtonStyle::Primary => {
                 let bg_color = ACCENT;
-                let fill = if matches!(status, button::Status::Pressed | button::Status::Hovered) {
+                let fill = if matches!(status, button::Status::Pressed) {
                     Color::from_rgba(bg_color.r * 0.85, bg_color.g * 0.85, bg_color.b * 0.85, bg_color.a)
                 } else {
                     bg_color
@@ -209,7 +209,7 @@ pub fn dialog_button<'a, Message: 'a + Clone>(
             }
             DialogButtonStyle::Danger => {
                 let bg_color = DANGER;
-                let fill = if matches!(status, button::Status::Pressed | button::Status::Hovered) {
+                let fill = if matches!(status, button::Status::Pressed) {
                     Color::from_rgba(bg_color.r * 0.85, bg_color.g * 0.85, bg_color.b * 0.85, bg_color.a)
                 } else {
                     bg_color
@@ -217,7 +217,7 @@ pub fn dialog_button<'a, Message: 'a + Clone>(
                 (Some(fill.into()), Color::WHITE)
             }
             DialogButtonStyle::Custom(bg_color) => {
-                let fill = if matches!(status, button::Status::Pressed | button::Status::Hovered) {
+                let fill = if matches!(status, button::Status::Pressed) {
                     Color::from_rgba(bg_color.r * 0.85, bg_color.g * 0.85, bg_color.b * 0.85, bg_color.a)
                 } else {
                     bg_color

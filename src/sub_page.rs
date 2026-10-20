@@ -10,10 +10,11 @@
 
 use iced::border::Radius;
 use iced::widget::scrollable::{Direction, Scrollbar};
-use iced::widget::{button, container, scrollable, text, Column, Row, Space};
-use iced::{Border, Color, Element, Length, Padding, Shadow};
+use iced::widget::{container, scrollable, text, Column, Row, Space};
+use iced::{Border, Color, Element, Length, Padding};
 use pomelo_material_symbols::Icon;
 
+use crate::button::Button;
 use crate::opaque::opaque;
 use crate::preferences::{FontTier, ThemeMode};
 
@@ -22,9 +23,9 @@ pub const SUB_PAGE_HEIGHT_RATIO: f32 = 1.0;
 /// The unified fixed height in pixels of a [`SubPage`] on a 480px screen (480px).
 pub const SUB_PAGE_HEIGHT: f32 = 480.0;
 /// Width of top capsule action buttons (matching Pomelo OS capsule button: 72px).
-pub const CAPSULE_BUTTON_WIDTH: f32 = 72.0;
+pub const CAPSULE_BUTTON_WIDTH: f32 = crate::button::CAPSULE_WIDTH;
 /// Height of top capsule action buttons (matching Pomelo OS capsule button: 48px).
-pub const CAPSULE_BUTTON_HEIGHT: f32 = 48.0;
+pub const CAPSULE_BUTTON_HEIGHT: f32 = crate::button::CAPSULE_HEIGHT;
 /// Glyph font size for top capsule action buttons.
 pub const CAPSULE_BUTTON_GLYPH: f32 = FontTier::Standard.base_size(); // 24.0 px
 /// Title font size for top navigation bar in a [`SubPage`] (standard 24px).
@@ -266,18 +267,21 @@ impl<'a, Message> SubPage<'a, Message> {
         // Top-left: Leading capsule button (Cancel / Back) or symmetric 72px space
         if let Some(leading) = &self.leading {
             let icon = leading.icon.unwrap_or(Icon::CLOSE);
-            let msg = if leading.enabled {
-                Some(leading.message.clone())
-            } else {
-                None
+            let mut btn = Button::capsule(icon)
+                .theme(self.theme)
+                .enabled(leading.enabled);
+
+            btn = match leading.style {
+                ActionStyle::Primary => btn.primary(),
+                ActionStyle::Destructive => btn.destructive(),
+                ActionStyle::Secondary => btn.secondary(),
             };
-            top_bar = top_bar.push(capsule_icon_button(
-                icon,
-                msg,
-                leading.style,
-                true,
-                self.theme,
-            ));
+
+            if leading.enabled {
+                btn = btn.on_press(leading.message.clone());
+            }
+
+            top_bar = top_bar.push(btn.view());
         } else {
             top_bar = top_bar.push(Space::new().width(Length::Fixed(CAPSULE_BUTTON_WIDTH)));
         }
@@ -312,18 +316,21 @@ impl<'a, Message> SubPage<'a, Message> {
         // Top-right: Trailing capsule button (Confirm / Done) or symmetric 72px space
         if let Some(trailing) = &self.trailing {
             let icon = trailing.icon.unwrap_or(Icon::CHECK);
-            let msg = if trailing.enabled {
-                Some(trailing.message.clone())
-            } else {
-                None
+            let mut btn = Button::capsule(icon)
+                .theme(self.theme)
+                .enabled(trailing.enabled);
+
+            btn = match trailing.style {
+                ActionStyle::Primary => btn.primary(),
+                ActionStyle::Destructive => btn.destructive(),
+                ActionStyle::Secondary => btn.secondary(),
             };
-            top_bar = top_bar.push(capsule_icon_button(
-                icon,
-                msg,
-                trailing.style,
-                false,
-                self.theme,
-            ));
+
+            if trailing.enabled {
+                btn = btn.on_press(trailing.message.clone());
+            }
+
+            top_bar = top_bar.push(btn.view());
         } else {
             top_bar = top_bar.push(Space::new().width(Length::Fixed(CAPSULE_BUTTON_WIDTH)));
         }
@@ -331,10 +338,10 @@ impl<'a, Message> SubPage<'a, Message> {
         let top_container = container(top_bar)
             .width(Length::Fill)
             .padding(Padding {
-                top: 14.0,
+                top: 16.0,
                 bottom: 6.0,
-                left: 16.0,
-                right: 16.0,
+                left: 18.0,
+                right: 18.0,
             });
 
         let body_container = if let Some(custom) = self.custom_body {
@@ -392,97 +399,7 @@ impl<'a, Message> SubPage<'a, Message> {
     }
 }
 
-/// Helper function to build a standard top capsule action button (72×48, radius 24).
-pub fn capsule_icon_button<'a, Message: Clone + 'a>(
-    icon: Icon,
-    message: Option<Message>,
-    style: ActionStyle,
-    is_cancel: bool,
-    theme: ThemeMode,
-) -> Element<'a, Message> {
-    let (normal_bg, pressed_bg, icon_color) = if is_cancel {
-        match theme {
-            ThemeMode::Dark => (
-                Color::from_rgba(1.0, 1.0, 1.0, 0.08),
-                Color::from_rgba(1.0, 1.0, 1.0, 0.18),
-                Color::from_rgba(1.0, 1.0, 1.0, 0.85),
-            ),
-            ThemeMode::Light => (
-                Color::from_rgba(0.0, 0.0, 0.0, 0.06),
-                Color::from_rgba(0.0, 0.0, 0.0, 0.14),
-                Color::from_rgba(0.0, 0.0, 0.0, 0.85),
-            ),
-        }
-    } else {
-        match style {
-            ActionStyle::Primary => (
-                theme.accent(),
-                Color::from_rgb(
-                    theme.accent().r * 0.85,
-                    theme.accent().g * 0.85,
-                    theme.accent().b * 0.85,
-                ),
-                Color::WHITE,
-            ),
-            ActionStyle::Destructive => (
-                theme.danger(),
-                Color::from_rgb(
-                    theme.danger().r * 0.85,
-                    theme.danger().g * 0.85,
-                    theme.danger().b * 0.85,
-                ),
-                Color::WHITE,
-            ),
-            ActionStyle::Secondary => match theme {
-                ThemeMode::Dark => (
-                    Color::from_rgba(1.0, 1.0, 1.0, 0.08),
-                    Color::from_rgba(1.0, 1.0, 1.0, 0.18),
-                    theme.text_primary(),
-                ),
-                ThemeMode::Light => (
-                    Color::from_rgba(0.0, 0.0, 0.0, 0.06),
-                    Color::from_rgba(0.0, 0.0, 0.0, 0.14),
-                    theme.text_primary(),
-                ),
-            },
-        }
-    };
 
-    let btn = button(
-        container(
-            text(icon.glyph())
-                .font(pomelo_material_symbols::font())
-                .size(CAPSULE_BUTTON_GLYPH)
-                .color(icon_color),
-        )
-        .center_x(Length::Fixed(CAPSULE_BUTTON_WIDTH))
-        .center_y(Length::Fixed(CAPSULE_BUTTON_HEIGHT)),
-    )
-    .padding(0)
-    .style(move |_t, status| {
-        let bg = if matches!(status, button::Status::Pressed | button::Status::Hovered) {
-            pressed_bg
-        } else {
-            normal_bg
-        };
-        button::Style {
-            background: Some(bg.into()),
-            border: Border {
-                radius: (CAPSULE_BUTTON_HEIGHT / 2.0).into(),
-                ..Border::default()
-            },
-            shadow: Shadow::default(),
-            snap: false,
-            ..button::Style::default()
-        }
-    });
-
-    if let Some(msg) = message {
-        btn.on_press(msg).into()
-    } else {
-        btn.into()
-    }
-}
 
 impl<'a, Message: Clone + 'a> From<SubPage<'a, Message>> for Element<'a, Message> {
     fn from(sub_page: SubPage<'a, Message>) -> Self {

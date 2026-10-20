@@ -13,13 +13,26 @@ use iced::advanced::widget::Operation;
 use iced::advanced::{Clipboard, Shell, Widget};
 use iced::{touch, Element, Event, Length, Point, Rectangle, Size, Vector};
 
+use std::collections::HashMap;
+
 use super::arena::{set_arena_context, GestureArenaManager, PointerId};
+
+/// Tracking state for an active pointer to arbitrate between taps and drags/scrolls.
+#[derive(Debug, Clone, Copy)]
+pub struct PointerTrack {
+    /// Initial press position.
+    pub origin: Point,
+    /// Whether displacement has exceeded `touch_slop`, committing to a drag/scroll.
+    pub is_dragging: bool,
+}
 
 /// Internal state of the gesture scope.
 #[derive(Debug, Default)]
 pub struct ScopeState {
     /// Active gesture arena manager for this scope.
     pub arena: GestureArenaManager,
+    /// Active pointer tracking for touch slop arbitration.
+    pub tracks: HashMap<PointerId, PointerTrack>,
 }
 
 /// A container widget establishing a gesture arena scope for its children.
@@ -31,6 +44,7 @@ pub struct GestureScope<
 > {
     content: Element<'a, Message, Theme, Renderer>,
     exclusive: bool,
+    touch_slop: f32,
 }
 
 impl<'a, Message, Theme, Renderer> GestureScope<'a, Message, Theme, Renderer> {
@@ -39,6 +53,7 @@ impl<'a, Message, Theme, Renderer> GestureScope<'a, Message, Theme, Renderer> {
         Self {
             content: content.into(),
             exclusive: false,
+            touch_slop: 10.0,
         }
     }
 
@@ -46,6 +61,15 @@ impl<'a, Message, Theme, Renderer> GestureScope<'a, Message, Theme, Renderer> {
     /// child gestures strictly capture events from ancestor scrollables.
     pub fn exclusive(mut self, exclusive: bool) -> Self {
         self.exclusive = exclusive;
+        self
+    }
+
+    /// Sets the touch slop threshold in pixels (default 10.0 px).
+    ///
+    /// Movements below this displacement are treated as touch jitter / slop and
+    /// suppressed from ancestor scrollables, preventing false button cancellations.
+    pub fn touch_slop(mut self, slop: f32) -> Self {
+        self.touch_slop = slop.max(0.0);
         self
     }
 }
@@ -123,52 +147,91 @@ where
     ) {
         let state = tree.state.downcast_mut::<ScopeState>();
 
-        // Identify pointer details from the event
-        let pointer_info: Option<(PointerId, Point, bool, bool, bool)> = match event {
+        // Identify pointer details from the event:
+        // (pointer_id, position, is_press, is_move, is_release, is_lost)
+        let pointer_info: Option<(PointerId, Point, bool, bool, bool, bool)> = match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                cursor.position().map(|p| (PointerId::MOUSE_LEFT, p, true, false, false))
+                cursor.position().map(|p| (PointerId::MOUSE_LEFT, p, true, false, false, false))
             }
             Event::Touch(touch::Event::FingerPressed { id, position }) => {
-                Some((PointerId::touch(id.0), *position, true, false, false))
+                Some((PointerId::touch(id.0), *position, true, false, false, false))
             }
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
-                Some((PointerId::MOUSE_LEFT, *position, false, false, false))
+                Some((PointerId::MOUSE_LEFT, *position, false, true, false, false))
             }
             Event::Touch(touch::Event::FingerMoved { id, position }) => {
-                Some((PointerId::touch(id.0), *position, false, false, false))
+                Some((PointerId::touch(id.0), *position, false, true, false, false))
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                cursor.position().map(|p| (PointerId::MOUSE_LEFT, p, false, true, false))
+                cursor.position().map(|p| (PointerId::MOUSE_LEFT, p, false, false, true, false))
             }
             Event::Touch(touch::Event::FingerLifted { id, position }) => {
-                Some((PointerId::touch(id.0), *position, false, true, false))
+                Some((PointerId::touch(id.0), *position, false, false, true, false))
             }
             Event::Touch(touch::Event::FingerLost { id, position }) => {
-                Some((PointerId::touch(id.0), *position, false, false, true))
+                Some((PointerId::touch(id.0), *position, false, false, false, true))
             }
             _ => None,
         };
 
-        if let Some((pointer, point, is_press, _, _)) = pointer_info {
+        if let Some((pointer, point, is_press, _, _, _)) = pointer_info {
             if is_press {
                 state.arena.open_arena(pointer, point);
+                state.tracks.insert(
+                    pointer,
+                    PointerTrack {
+                        origin: point,
+                        is_dragging: false,
+                    },
+                );
             }
         }
+
+        // Determine whether a move event should be suppressed to protect child taps.
+        // If displacement is within touch_slop, we do not forward move events to the child
+        // scrollable, preventing the scrollable from prematurely cancelling child buttons with FingerLost.
+        let should_suppress_move = if let Some((pointer, point, _, is_move, _, _)) = pointer_info {
+            if is_move {
+                if let Some(track) = state.tracks.get_mut(&pointer) {
+                    if track.is_dragging {
+                        false
+                    } else {
+                        let dx = point.x - track.origin.x;
+                        let dy = point.y - track.origin.y;
+                        let dist = (dx * dx + dy * dy).sqrt();
+                        if dist >= self.touch_slop {
+                            track.is_dragging = true;
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         // Set thread-local arena context for child widgets
         let prev_ctx = set_arena_context(Some(state.arena.clone()));
 
-        // Dispatch event traversal to child tree
-        self.content.as_widget_mut().update(
-            &mut tree.children[0],
-            event,
-            layout,
-            cursor,
-            renderer,
-            clipboard,
-            shell,
-            viewport,
-        );
+        if !should_suppress_move {
+            // Dispatch event traversal to child tree
+            self.content.as_widget_mut().update(
+                &mut tree.children[0],
+                event,
+                layout,
+                cursor,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
+        }
 
         // Retrieve updated arena state
         let updated_arena = set_arena_context(prev_ctx);
@@ -177,7 +240,10 @@ where
         }
 
         // Handle pointer release (sweep & release arena)
-        if let Some((pointer, _, _, is_release, is_lost)) = pointer_info {
+        if let Some((pointer, _, _, _, is_release, is_lost)) = pointer_info {
+            if is_release || is_lost {
+                state.tracks.remove(&pointer);
+            }
             if is_release {
                 state.arena.sweep(pointer);
                 state.arena.release(pointer);
@@ -253,3 +319,42 @@ impl<'a, Message: 'a, Theme: 'a, Renderer: 'a + renderer::Renderer>
         Element::new(scope)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use iced::widget::text;
+
+    #[test]
+    fn gesture_scope_defaults_and_builder() {
+        let content: Element<'_, (), iced::Theme, ()> = text("Hello").into();
+        let scope = gesture_scope(content).touch_slop(15.0).exclusive(true);
+        assert_eq!(scope.touch_slop, 15.0);
+        assert!(scope.exclusive);
+    }
+
+    #[test]
+    fn scope_state_tracks_pointers() {
+        let mut state = ScopeState::default();
+        let ptr = PointerId::touch(1);
+        let origin = Point::new(10.0, 20.0);
+
+        state.tracks.insert(
+            ptr,
+            PointerTrack {
+                origin,
+                is_dragging: false,
+            },
+        );
+        assert!(state.tracks.contains_key(&ptr));
+
+        let track = state.tracks.get_mut(&ptr).unwrap();
+        assert!(!track.is_dragging);
+        track.is_dragging = true;
+        assert!(state.tracks.get(&ptr).unwrap().is_dragging);
+
+        state.tracks.remove(&ptr);
+        assert!(!state.tracks.contains_key(&ptr));
+    }
+}
+
