@@ -120,9 +120,6 @@ pub struct SubPage<'a, Message> {
     pub font_tier: FontTier,
 }
 
-/// Backward compatibility alias.
-pub type ActionSheet<'a, Message> = SubPage<'a, Message>;
-
 impl<'a, Message> std::fmt::Debug for SubPage<'a, Message> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SubPage")

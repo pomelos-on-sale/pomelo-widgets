@@ -27,7 +27,6 @@
 //! does, and it has no business with a keyboard.
 
 pub mod sub_page;
-pub use sub_page as action_sheet;
 pub mod animation;
 pub mod app;
 pub mod button;
@@ -51,19 +50,18 @@ pub use page::{
 pub use usage_card::{usage_bar, UsageCard, BAR_GAP, BAR_HEIGHT, BAR_RADIUS, USAGE_PADDING};
 
 pub use sub_page::{
-    capsule_icon_button, ActionItem, ActionSheet, ActionStyle, SubPage, CAPSULE_BUTTON_GLYPH,
+    capsule_icon_button, ActionItem, ActionStyle, SubPage, CAPSULE_BUTTON_GLYPH,
     CAPSULE_BUTTON_HEIGHT, CAPSULE_BUTTON_WIDTH, SUB_PAGE_HEIGHT, SUB_PAGE_HEIGHT_RATIO,
     TOP_BAR_ICON, TOP_BAR_TITLE_FONT,
 };
 pub use animation::{AnimationController, Curve};
 pub use app::{interval_stream, AppIcon, AppMeta, AppPreferences, BitmapIcon};
 pub use item::{
-    card_separator, detail_row, item_separator, Item, ItemBadge, ItemGroup, NavigationAction,
-    OpenPage, CARD_PADDING, DETAIL_FONT, ITEM_FONT, ITEM_PADDING,
+    detail_row, item_separator, Item, ItemBadge, ItemGroup, NavigationAction,
+    OpenPage, DETAIL_FONT, ITEM_FONT, ITEM_PADDING,
 };
 pub use section::{
-    card_surface, section_surface, Section, CARD_BORDER_WIDTH, CARD_RADIUS, SECTION_BORDER_WIDTH,
-    SECTION_RADIUS,
+    section_surface, Section, SECTION_BORDER_WIDTH, SECTION_RADIUS,
 };
 pub use toggle::{
     toggle_switch, KNOB_RADIUS, KNOB_SIZE, TOGGLE_H, TOGGLE_INSET, TOGGLE_RADIUS, TOGGLE_W,

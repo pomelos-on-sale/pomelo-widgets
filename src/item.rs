@@ -22,9 +22,6 @@ pub const ITEM_PADDING: Padding = Padding {
     right: 16.0,
 };
 
-/// Backward-compatible alias for [`ITEM_PADDING`].
-pub const CARD_PADDING: Padding = ITEM_PADDING;
-
 /// A standard horizontal separator rule for use between items.
 pub fn item_separator<'a, Message: 'a>(theme: ThemeMode) -> iced::widget::Rule<'a> {
     rule::horizontal(1)
@@ -34,11 +31,6 @@ pub fn item_separator<'a, Message: 'a>(theme: ThemeMode) -> iced::widget::Rule<'
             fill_mode: rule::FillMode::Full,
             snap: false,
         })
-}
-
-/// Backward-compatible alias for [`item_separator`].
-pub fn card_separator<'a, Message: 'a>(theme: ThemeMode) -> iced::widget::Rule<'a> {
-    item_separator::<Message>(theme)
 }
 
 /// A standard key-value detail row inside an item group.

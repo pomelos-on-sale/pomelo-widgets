@@ -368,8 +368,8 @@ impl ScreenOffTimeout {
 }
 
 
-/// Subdirectory / namespace where system settings are stored.
-pub const PREFERENCES_DIR: &str = "SETTINGS";
+/// Namespace under KV storage where system preferences are stored.
+pub const PREFERENCES_NAMESPACE: &str = "SETTINGS";
 
 /// Returns whether the current process is running as a test harness binary.
 #[inline]
@@ -449,7 +449,7 @@ impl SystemPreferences {
     /// Loads preferences from active persistent storage (NVS KV on hardware, or mock KV on desktop).
     /// Falls back to default preferences if not found or corrupted.
     pub fn load() -> Self {
-        if is_test_runner() && std::env::var("POMELO_APP_DATA").is_err() {
+        if is_test_runner() && std::env::var("POMELO_STORAGE_DIR").is_err() {
             return Self::default();
         }
         <Self as PersistentConfig>::load()
@@ -457,7 +457,7 @@ impl SystemPreferences {
 
     /// Saves preferences to active persistent storage (NVS KV on hardware, or mock KV on desktop).
     pub fn save(&self) -> io::Result<()> {
-        if is_test_runner() && std::env::var("POMELO_APP_DATA").is_err() {
+        if is_test_runner() && std::env::var("POMELO_STORAGE_DIR").is_err() {
             return Ok(());
         }
         <Self as PersistentConfig>::save(self)
@@ -465,7 +465,7 @@ impl SystemPreferences {
 }
 
 impl PersistentConfig for SystemPreferences {
-    const APP_ID: &'static str = PREFERENCES_DIR;
+    const APP_ID: &'static str = PREFERENCES_NAMESPACE;
     const KEY: &'static str = "preferences";
 }
 
@@ -527,7 +527,7 @@ mod tests {
     fn preferences_roundtrip_persistence() {
         let temp_dir = std::env::temp_dir().join(format!("pomelo_test_prefs_{}", std::process::id()));
         let _ = fs::remove_dir_all(&temp_dir);
-        std::env::set_var("POMELO_APP_DATA", &temp_dir);
+        std::env::set_var("POMELO_STORAGE_DIR", &temp_dir);
 
         let initial = SystemPreferences::load();
         assert_eq!(initial.screen_off_timeout, ScreenOffTimeout::Never);
@@ -549,7 +549,7 @@ mod tests {
         assert_eq!(loaded.screen_off_timeout, ScreenOffTimeout::ThirtySeconds);
         assert!(!loaded.stay_awake_on_usb);
 
-        std::env::remove_var("POMELO_APP_DATA");
+        std::env::remove_var("POMELO_STORAGE_DIR");
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }

@@ -7,13 +7,9 @@ use crate::preferences::ThemeMode;
 
 /// Default corner radius for standard sections and cards (16px).
 pub const SECTION_RADIUS: f32 = 16.0;
-/// Backward-compatible alias for [`SECTION_RADIUS`].
-pub const CARD_RADIUS: f32 = SECTION_RADIUS;
 
 /// Default hairline border width for sections and cards (1px).
 pub const SECTION_BORDER_WIDTH: f32 = 1.0;
-/// Backward-compatible alias for [`SECTION_BORDER_WIDTH`].
-pub const CARD_BORDER_WIDTH: f32 = SECTION_BORDER_WIDTH;
 
 /// A rounded surface container styled according to [`ThemeMode`].
 ///
@@ -33,14 +29,6 @@ pub fn section_surface<'a, Message: 'a>(
             },
             ..Default::default()
         })
-}
-
-/// Backward-compatible alias for [`section_surface`].
-pub fn card_surface<'a, Message: 'a>(
-    content: impl Into<Element<'a, Message>>,
-    theme: ThemeMode,
-) -> iced::widget::Container<'a, Message> {
-    section_surface(content, theme)
 }
 
 /// A general-purpose visual section / card container providing rounded surfaces, borders,
