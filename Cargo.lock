@@ -1704,7 +1704,6 @@ dependencies = [
 [[package]]
 name = "pomelo-hal"
 version = "0.1.0"
-source = "git+https://github.com/pomelos-on-sale/pomelo-hal.git?rev=9c028d4d029ac2663201aa3564e38ef900f31fa7#9c028d4d029ac2663201aa3564e38ef900f31fa7"
 dependencies = [
  "serde",
  "serde_json",

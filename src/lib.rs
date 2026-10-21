@@ -57,7 +57,10 @@ pub use sub_page::{
     TOP_BAR_ICON, TOP_BAR_TITLE_FONT,
 };
 pub use animation::{AnimationController, Curve};
-pub use app::{interval_stream, AppIcon, AppMeta, AppPreferences, BitmapIcon, KeepAwake};
+pub use app::{
+    board_event_stream, interval_stream, minute_tick_stream, second_tick_stream, AppIcon, AppMeta,
+    AppPreferences, BitmapIcon, KeepAwake,
+};
 pub use item::{
     detail_row, item_separator, Item, ItemBadge, ItemGroup, NavigationAction,
     OpenPage, DETAIL_FONT, ITEM_FONT, ITEM_PADDING,

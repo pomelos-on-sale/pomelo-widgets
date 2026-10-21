@@ -62,6 +62,66 @@ pub fn interval_stream<T: Send + 'static>(
     rx
 }
 
+/// Creates an asynchronous iced Stream that receives SystemEvents from a Board.
+/// Automatically unregisters the listener when the stream is dropped.
+pub fn board_event_stream(
+    board: std::sync::Arc<pomelo_hal::Board>,
+) -> impl iced::futures::Stream<Item = pomelo_hal::SystemEvent> {
+    use iced::futures::StreamExt;
+    let (tx, rx) = iced::futures::channel::mpsc::channel(16);
+    let board_clone = std::sync::Arc::clone(&board);
+    let tx_event = tx;
+    let listener_id = board.on_event(move |event| {
+        let mut tx = tx_event.clone();
+        let _ = tx.try_send(event.clone());
+    });
+
+    struct ListenerGuard {
+        board: std::sync::Arc<pomelo_hal::Board>,
+        id: u64,
+    }
+    impl Drop for ListenerGuard {
+        fn drop(&mut self) {
+            self.board.remove_listener(self.id);
+        }
+    }
+
+    let guard = std::sync::Arc::new(ListenerGuard {
+        board: board_clone,
+        id: listener_id,
+    });
+    rx.map(move |item| {
+        let _ = &guard;
+        item
+    })
+}
+
+/// Creates an asynchronous iced Stream that yields whenever a system-wide MinuteTick occurs.
+pub fn minute_tick_stream(
+    board: std::sync::Arc<pomelo_hal::Board>,
+) -> impl iced::futures::Stream<Item = u64> {
+    use iced::futures::StreamExt;
+    board_event_stream(board).filter_map(|event| async move {
+        match event {
+            pomelo_hal::SystemEvent::MinuteTick { unix_secs } => Some(unix_secs),
+            _ => None,
+        }
+    })
+}
+
+/// Creates an asynchronous iced Stream that yields whenever a system-wide SecondTick occurs.
+pub fn second_tick_stream(
+    board: std::sync::Arc<pomelo_hal::Board>,
+) -> impl iced::futures::Stream<Item = u64> {
+    use iced::futures::StreamExt;
+    board_event_stream(board).filter_map(|event| async move {
+        match event {
+            pomelo_hal::SystemEvent::SecondTick { unix_secs } => Some(unix_secs),
+            _ => None,
+        }
+    })
+}
+
 
 /// A baked bitmap icon, with 16-bit RGB565 color pixels and an 8-bit alpha mask.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
