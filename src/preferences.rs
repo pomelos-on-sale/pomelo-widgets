@@ -375,6 +375,10 @@ const fn default_volume() -> u8 {
     75
 }
 
+const fn default_brightness() -> u8 {
+    100
+}
+
 /// Aggregated system preferences.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SystemPreferences {
@@ -393,6 +397,9 @@ pub struct SystemPreferences {
     /// Audio volume level (0..=100). Defaults to 75.
     #[serde(default = "default_volume")]
     pub volume: u8,
+    /// Display brightness level (10..=100). Defaults to 100.
+    #[serde(default = "default_brightness")]
+    pub brightness: u8,
 }
 
 impl Default for SystemPreferences {
@@ -404,6 +411,7 @@ impl Default for SystemPreferences {
             screen_off_timeout: ScreenOffTimeout::Never,
             stay_awake_on_usb: true,
             volume: 75,
+            brightness: 100,
         }
     }
 }
@@ -411,6 +419,8 @@ impl Default for SystemPreferences {
 impl SystemPreferences {
     /// Default audio volume level (75%).
     pub const DEFAULT_VOLUME: u8 = 75;
+    /// Default display brightness level (100%).
+    pub const DEFAULT_BRIGHTNESS: u8 = 100;
 
     /// Returns the default volume level.
     #[inline]
@@ -418,7 +428,13 @@ impl SystemPreferences {
         Self::DEFAULT_VOLUME
     }
 
-    /// Creates a new preference set with default timeouts (Never), stay awake on USB enabled, and 75% volume.
+    /// Returns the default brightness level.
+    #[inline]
+    pub const fn default_brightness() -> u8 {
+        Self::DEFAULT_BRIGHTNESS
+    }
+
+    /// Creates a new preference set with default timeouts (Never), stay awake on USB enabled, 75% volume, and 100% brightness.
     pub const fn new(language: Language, theme: ThemeMode, font_tier: FontSizeTier) -> Self {
         Self {
             language,
@@ -427,6 +443,7 @@ impl SystemPreferences {
             screen_off_timeout: ScreenOffTimeout::Never,
             stay_awake_on_usb: true,
             volume: 75,
+            brightness: 100,
         }
     }
 
@@ -445,6 +462,18 @@ impl SystemPreferences {
     /// Sets the audio volume level (0..=100).
     pub const fn with_volume(mut self, volume: u8) -> Self {
         self.volume = volume;
+        self
+    }
+
+    /// Sets the display brightness level (10..=100).
+    pub const fn with_brightness(mut self, brightness: u8) -> Self {
+        self.brightness = if brightness < 10 {
+            10
+        } else if brightness > 100 {
+            100
+        } else {
+            brightness
+        };
         self
     }
 
@@ -545,6 +574,7 @@ mod tests {
         assert_eq!(initial.screen_off_timeout, ScreenOffTimeout::Never);
         assert!(initial.stay_awake_on_usb);
         assert_eq!(initial.volume, 75);
+        assert_eq!(initial.brightness, 100);
 
         let modified = SystemPreferences {
             language: Language::English,
@@ -553,6 +583,7 @@ mod tests {
             screen_off_timeout: ScreenOffTimeout::ThirtySeconds,
             stay_awake_on_usb: false,
             volume: 60,
+            brightness: 80,
         };
 
         modified.save().expect("save should succeed");
@@ -563,6 +594,7 @@ mod tests {
         assert_eq!(loaded.screen_off_timeout, ScreenOffTimeout::ThirtySeconds);
         assert!(!loaded.stay_awake_on_usb);
         assert_eq!(loaded.volume, 60);
+        assert_eq!(loaded.brightness, 80);
 
         std::env::remove_var("POMELO_STORAGE_DIR");
         let _ = fs::remove_dir_all(&temp_dir);
