@@ -371,6 +371,10 @@ const fn default_true() -> bool {
     true
 }
 
+const fn default_volume() -> u8 {
+    75
+}
+
 /// Aggregated system preferences.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SystemPreferences {
@@ -386,6 +390,9 @@ pub struct SystemPreferences {
     /// Whether to stay awake while connected to USB. Defaults to true.
     #[serde(default = "default_true")]
     pub stay_awake_on_usb: bool,
+    /// Audio volume level (0..=100). Defaults to 75.
+    #[serde(default = "default_volume")]
+    pub volume: u8,
 }
 
 impl Default for SystemPreferences {
@@ -396,12 +403,22 @@ impl Default for SystemPreferences {
             font_tier: FontSizeTier::Standard,
             screen_off_timeout: ScreenOffTimeout::Never,
             stay_awake_on_usb: true,
+            volume: 75,
         }
     }
 }
 
 impl SystemPreferences {
-    /// Creates a new preference set with default timeouts (Never) and stay awake on USB enabled.
+    /// Default audio volume level (75%).
+    pub const DEFAULT_VOLUME: u8 = 75;
+
+    /// Returns the default volume level.
+    #[inline]
+    pub const fn default_volume() -> u8 {
+        Self::DEFAULT_VOLUME
+    }
+
+    /// Creates a new preference set with default timeouts (Never), stay awake on USB enabled, and 75% volume.
     pub const fn new(language: Language, theme: ThemeMode, font_tier: FontSizeTier) -> Self {
         Self {
             language,
@@ -409,6 +426,7 @@ impl SystemPreferences {
             font_tier,
             screen_off_timeout: ScreenOffTimeout::Never,
             stay_awake_on_usb: true,
+            volume: 75,
         }
     }
 
@@ -421,6 +439,12 @@ impl SystemPreferences {
     /// Sets whether to stay awake while connected to USB.
     pub const fn with_stay_awake_on_usb(mut self, stay_awake_on_usb: bool) -> Self {
         self.stay_awake_on_usb = stay_awake_on_usb;
+        self
+    }
+
+    /// Sets the audio volume level (0..=100).
+    pub const fn with_volume(mut self, volume: u8) -> Self {
+        self.volume = volume;
         self
     }
 
@@ -520,6 +544,7 @@ mod tests {
         let initial = SystemPreferences::load();
         assert_eq!(initial.screen_off_timeout, ScreenOffTimeout::Never);
         assert!(initial.stay_awake_on_usb);
+        assert_eq!(initial.volume, 75);
 
         let modified = SystemPreferences {
             language: Language::English,
@@ -527,6 +552,7 @@ mod tests {
             font_tier: FontSizeTier::Large,
             screen_off_timeout: ScreenOffTimeout::ThirtySeconds,
             stay_awake_on_usb: false,
+            volume: 60,
         };
 
         modified.save().expect("save should succeed");
@@ -536,6 +562,7 @@ mod tests {
         assert_eq!(loaded, modified);
         assert_eq!(loaded.screen_off_timeout, ScreenOffTimeout::ThirtySeconds);
         assert!(!loaded.stay_awake_on_usb);
+        assert_eq!(loaded.volume, 60);
 
         std::env::remove_var("POMELO_STORAGE_DIR");
         let _ = fs::remove_dir_all(&temp_dir);
